@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>System Self-Check Alert</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+        .content { padding: 20px; }
+        .critical { background-color: #fee; border-left: 4px solid #d32f2f; padding: 15px; margin: 10px 0; }
+        .warning { background-color: #fff3cd; border-left: 4px solid #f57c00; padding: 15px; margin: 10px 0; }
+        .success { background-color: #e8f5e8; border-left: 4px solid #388e3c; padding: 15px; margin: 10px 0; }
+        .footer { background-color: #f8f9fa; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px; color: #666; }
+        pre { background-color: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 13px; }
+        .metric { display: inline-block; margin: 10px 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; min-width: 120px; text-align: center; }
+        .metric-value { font-size: 24px; font-weight: bold; color: #333; }
+        .metric-label { font-size: 12px; color: #666; text-transform: uppercase; }
+        .issue-list { list-style: none; padding: 0; }
+        .issue-item { padding: 8px 12px; margin: 5px 0; background: #fff; border-left: 3px solid #f57c00; border-radius: 3px; }
+        .critical-item { border-left-color: #d32f2f; background: #fee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 System Self-Check Alert</h1>
+            <p>Hostname: home | 2025-09-28 12:02:23</p>
+        </div>
+        <div class="content">
+            <div class="critical">
+                <h2>🚨 Critical Issues Detected</h2>
+                <p>Immediate attention required</p>
+            </div>
+
+            <div style="text-align: center; margin: 20px 0;">
+                <div class="metric">
+                    <div class="metric-value">4.0%</div>
+                    <div class="metric-label">CPU Usage</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">32.4%</div>
+                    <div class="metric-label">Memory</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">6</div>
+                    <div class="metric-label">Critical Issues</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">42</div>
+                    <div class="metric-label">Warnings</div>
+                </div>
+            </div>
+
+            <h3 style="color: #d32f2f;">🚨 Critical Issues</h3>
+            <ul class="issue-list">
+                <li class="issue-item critical-item">High disk usage on /snap/bare/5: 100.0%</li>
+                <li class="issue-item critical-item">High disk usage on /snap/core22/2111: 100.0%</li>
+                <li class="issue-item critical-item">High disk usage on /snap/core22/2133: 100.0%</li>
+                <li class="issue-item critical-item">High disk usage on /snap/cups/1100: 100.0%</li>
+                <li class="issue-item critical-item">High disk usage on /snap/gtk-common-themes/1535: 100.0%</li>
+                <li class="issue-item critical-item">High disk usage on /snap/snapd/25202: 100.0%</li>
+            </ul>
+
+            <h3 style="color: #f57c00;">⚠️ Security Warnings</h3>
+            <ul class="issue-list">
+                <li class="issue-item">Unexpected open port: 5678 (unknown process)</li>
+                <li class="issue-item">Suspicious connection to foreign IP 160.79.104.10:443</li>
+                <li class="issue-item">Unusual service listening on port 5432</li>
+                <li class="issue-item">New unusual process detected: claude (PID: 249276)</li>
+                <li class="issue-item">Connection to unusual high port 58531</li>
+                <li class="issue-item">... and 37 more security warnings</li>
+            </ul>
+
+            <h3 style="color: #388e3c;">💾 System Resources</h3>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 4px;">
+                <strong>Disk Usage:</strong><br>
+                • Main disk (/): 43.0% used ✓<br>
+                • Snap packages: Multiple at 100% usage ⚠️<br><br>
+                <strong>Network:</strong> Connected ✓<br>
+                <strong>Load Average:</strong> 0.43 ✓
+            </div>
+
+            <details style="margin-top: 20px;">
+                <summary style="cursor: pointer; font-weight: bold; padding: 10px; background: #f8f9fa; border-radius: 4px;">📋 Full Technical Report</summary>
+                <pre style="margin-top: 10px;">System Self-Check Report - 2025-09-28 12:02:23
+============================================================
+Hostname: home
+Platform: Linux-6.8.0-84-generic-x86_64-with-glibc2.39
+Architecture: x86_64
+
+CRITICAL ISSUES:
+--------------------
+• [Resources] High disk usage on /snap/bare/5: 100.0%
+• [Resources] High disk usage on /snap/core22/2111: 100.0%
+• [Resources] High disk usage on /snap/core22/2133: 100.0%
+• [Resources] High disk usage on /snap/cups/1100: 100.0%
+• [Resources] High disk usage on /snap/gtk-common-themes/1535: 100.0%
+• [Resources] High disk usage on /snap/snapd/25202: 100.0%
+
+PERFORMANCE:
+------------
+CPU Usage: 4.0%
+Memory Usage: 32.4%
+Swap Usage: 0.0%
+Load Average: 0.43
+
+RESOURCES:
+----------
+Disk /: 43.0% used
+Internet: Connected</pre>
+            </details>
+
+        </div>
+        <div class="footer">
+            Generated by Self-Check System Monitor |
+            <a href="https://github.com/bk86a/self-check">GitHub Repository</a>
+        </div>
+    </div>
+</body>
+</html>

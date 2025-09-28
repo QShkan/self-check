@@ -34,17 +34,37 @@
     "check_suspicious_connections": true,
     "check_unusual_processes": true,
     "suspicious_processes": [],
-    "whitelist_ips": ["127.0.0.1", "::1"],
-    "whitelist_ports": [22, 80, 443, 53, 25, 993, 995],
+    "whitelist_ips": [
+      "127.0.0.1",
+      "::1"
+    ],
+    "whitelist_ports": [
+      22,
+      80,
+      443,
+      53,
+      25,
+      993,
+      995
+    ],
     "max_failed_logins": 10,
     "reboot_check_hours": 24,
     "connection_monitoring": true
   },
   "services": {
-    "critical_services": ["ssh", "cron"],
+    "critical_services": [
+      "ssh",
+      "cron"
+    ],
     "check_systemd": true
   },
-  "expected_ports": [22, 80, 443, 53, 25],
+  "expected_ports": [
+    22,
+    80,
+    443,
+    53,
+    25
+  ],
   "debug": false,
   "quiet": false,
   "performance": {

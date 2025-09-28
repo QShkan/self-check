@@ -19,8 +19,8 @@ import hashlib
 import pickle
 import re
 from datetime import datetime, timedelta
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Set
 import psutil
@@ -117,13 +117,22 @@ class SystemChecker:
         if self.config.get('debug', False):
             log_level = logging.DEBUG
 
+        handlers = [logging.StreamHandler()]
+
+        # Try to add file handler, fallback to temp if no permission
+        log_files = ['/var/log/self-check.log', '/tmp/self-check.log', 'self-check.log']
+
+        for log_file in log_files:
+            try:
+                handlers.append(logging.FileHandler(log_file))
+                break
+            except PermissionError:
+                continue
+
         logging.basicConfig(
             level=log_level,
             format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('/var/log/self-check.log'),
-                logging.StreamHandler()
-            ]
+            handlers=handlers
         )
         self.logger = logging.getLogger(__name__)
 
@@ -253,7 +262,10 @@ class SystemChecker:
                 }
                 disk_usage.append(disk_info)
 
-                if percent > self.config['thresholds']['disk_usage']:
+                # Skip snap packages (they're always 100% by design) and small partitions
+                if (percent > self.config['thresholds']['disk_usage'] and
+                    not partition.mountpoint.startswith('/snap/') and
+                    usage.total > 100 * 1024 * 1024):  # Skip partitions smaller than 100MB
                     self.add_issue("Resources",
                                  f"High disk usage on {partition.mountpoint}: {percent:.1f}%")
 
@@ -684,22 +696,24 @@ class SystemChecker:
 
                     # Check for processes not in baseline
                     if proc_name not in baseline and proc_name not in self.config['security']['suspicious_processes']:
-                        # Skip common system processes
+                        # Skip common system processes and kernel threads
                         if not self._is_system_process(proc_name):
-                            # Check if process is recently created
+                            # Check if process is recently created (last 10 minutes, not hour)
                             create_time = datetime.fromtimestamp(proc_info['create_time'])
-                            if (datetime.now() - create_time).total_seconds() < 3600:  # Last hour
-                                unusual_processes.append({
-                                    'pid': proc_info['pid'],
-                                    'name': proc_name,
-                                    'cmdline': ' '.join(proc_info['cmdline']) if proc_info['cmdline'] else '',
-                                    'create_time': create_time.isoformat(),
-                                    'cpu_percent': proc_info['cpu_percent']
-                                })
+                            if (datetime.now() - create_time).total_seconds() < 600:  # Last 10 minutes
+                                # Skip very short-lived processes
+                                if (datetime.now() - create_time).total_seconds() > 5:
+                                    unusual_processes.append({
+                                        'pid': proc_info['pid'],
+                                        'name': proc_name,
+                                        'cmdline': ' '.join(proc_info['cmdline']) if proc_info['cmdline'] else '',
+                                        'create_time': create_time.isoformat(),
+                                        'cpu_percent': proc_info['cpu_percent']
+                                    })
 
-                                self.add_issue("Security",
-                                              f"New unusual process detected: {proc_name} (PID: {proc_info['pid']})",
-                                              "warning")
+                                    self.add_issue("Security",
+                                                  f"New unusual process detected: {proc_name} (PID: {proc_info['pid']})",
+                                                  "warning")
 
                     # Check for processes consuming unusual CPU
                     if proc_info['cpu_percent'] and proc_info['cpu_percent'] > 80:
@@ -746,10 +760,13 @@ class SystemChecker:
 
     def _is_system_process(self, process_name: str) -> bool:
         """Check if a process is a known system process"""
-        system_prefixes = ['systemd', 'kernel', 'kthread', 'ksoftirq', 'rcu_', 'watchdog']
+        system_prefixes = ['systemd', 'kernel', 'kthread', 'ksoftirq', 'rcu_', 'watchdog', 'kworker']
         system_processes = {
             'init', 'bash', 'sh', 'python3', 'python', 'perl', 'java', 'node',
-            'sshd', 'cron', 'crond', 'dbus', 'NetworkManager', 'dhclient'
+            'sshd', 'cron', 'crond', 'dbus', 'dbus-daemon', 'NetworkManager', 'dhclient',
+            'systemctl', 'ping', 'timeout', 'grep', 'awk', 'sed', 'tar', 'gzip',
+            'curl', 'wget', 'git', 'vim', 'nano', 'less', 'more', 'cat', 'ls',
+            'sudo', 'su', 'ps', 'top', 'htop', 'netstat', 'lsof', 'claude'
         }
 
         if process_name in system_processes:
@@ -816,15 +833,15 @@ class SystemChecker:
                 self.logger.error("Email configuration incomplete")
                 return
 
-            msg = MimeMultipart()
+            msg = MIMEMultipart()
             msg['From'] = from_email
             msg['To'] = to_email
             msg['Subject'] = f"[Self-Check Alert] {subject}"
 
             # Create HTML email body
             html_body = self._create_html_email(body)
-            msg.attach(MimeText(html_body, 'html'))
-            msg.attach(MimeText(body, 'plain'))
+            msg.attach(MIMEText(html_body, 'html'))
+            msg.attach(MIMEText(body, 'plain'))
 
             server = smtplib.SMTP(smtp_server, smtp_port)
 
