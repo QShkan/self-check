@@ -1,23 +1,58 @@
 # Self-Check System Monitor
 
-A comprehensive system monitoring script for performance, resources, and security checks. Designed to work across multiple architectures including Raspberry Pi, with email notifications for critical issues.
+A comprehensive, enterprise-grade system monitoring script for performance, resources, and security checks. Designed to work across multiple architectures including VMs, Raspberry Pi, and cloud instances, with professional HTML email notifications and Docker container detection.
 
-## Features
+## 🚀 Latest Features (v2.0)
+
+### **🔒 Enhanced Security Monitoring**
+- **SSH Configuration Analysis**: Detects insecure SSH settings (root login, password auth, empty passwords)
+- **Firewall Status Monitoring**: UFW and iptables rule validation
+- **System Hardening Checks**: Critical sysctl security settings validation
+- **File Permission Auditing**: World-writable directories and SUID/SGID file monitoring
+- **Container Security**: Docker container detection and service identification
+
+### **🐳 Docker & Container Support**
+- **Intelligent Docker Detection**: Automatically identifies 25+ container types (n8n, PostgreSQL, nginx, etc.)
+- **Port-to-Service Mapping**: Maps Docker ports to actual services (e.g., port 5678 → n8n)
+- **Container Process Identification**: No more "unknown process" warnings for containerized services
+
+### **📧 Professional Email Notifications**
+- **HTML-Only Format**: Clean, professional email layout (no plain text attachments)
+- **Severity-Based Subjects**: "CRITICAL System Alert" vs "System Warnings"
+- **Responsive Design**: Mobile-friendly email formatting
+- **Enhanced Readability**: Proper color contrast and spacing
+
+### **🖥️ Virtual Machine Optimization**
+- **VM Detection**: Automatically detects QEMU/KVM, VMware, Hyper-V environments
+- **Smart Temperature Monitoring**: Adapts to VM limitations with appropriate messaging
+- **Proxmox Integration**: Optimized for Proxmox VE virtual machines
+
+### **📊 Improved Reporting**
+- **Running Services List**: Complete inventory of active systemd services and network services
+- **Snap Package Filtering**: Excludes irrelevant snap disk usage (they're always 100%)
+- **Enhanced Process Detection**: Better identification of system and application processes
+- **Duplicate Elimination**: Removed redundant security warnings
+
+## Core Features
 
 - **Performance Monitoring**: CPU usage, memory usage, load average, swap usage
-- **Resource Monitoring**: Disk space, network connectivity
+- **Resource Monitoring**: Disk space, network connectivity (with snap filtering)
 - **Advanced Security Monitoring**:
+  - SSH configuration security analysis
+  - Firewall status and rule validation
+  - System hardening (sysctl) checks
+  - File permission auditing (world-writable dirs, SUID/SGID files)
   - Failed login attempts detection
   - Suspicious network connections monitoring
   - Unexpected reboot detection
   - Unusual process identification
-  - Open ports scanning
+  - Open ports scanning with Docker integration
   - SSH key permissions validation
   - System updates tracking
-- **Temperature Monitoring**: System temperature (especially useful for Raspberry Pi)
-- **Service Monitoring**: Critical system services status
-- **Email Notifications**: HTML-formatted alerts for critical issues
-- **Cross-Architecture Support**: Works on x86, ARM, Raspberry Pi, and other architectures
+- **Temperature Monitoring**: Intelligent temperature detection (physical hardware, VMs, containers)
+- **Service Monitoring**: Critical system services status with Docker container support
+- **Email Notifications**: Professional HTML-formatted alerts with severity-based subjects
+- **Cross-Architecture Support**: Works on x86, ARM, Raspberry Pi, VMs, and containers
 - **Performance Optimized**: Intelligent caching and lightweight execution for frequent monitoring
 - **Configurable Thresholds**: Customizable warning and critical levels
 
@@ -147,11 +182,19 @@ To prevent false positives for legitimate services, add ports to the whitelist:
     "critical_services": ["ssh", "cron", "networking"]
   },
   "security": {
+    "check_failed_logins": true,
+    "check_open_ports": true,
+    "check_updates": true,
+    "check_ssh_keys": true,
     "check_reboots": true,
     "check_suspicious_connections": true,
     "check_unusual_processes": true,
+    "check_ssh_config": true,          // NEW: SSH configuration analysis
+    "check_firewall": true,            // NEW: Firewall status monitoring
+    "check_file_permissions": true,    // NEW: File permission auditing
+    "check_system_hardening": true,    // NEW: sysctl security settings
     "whitelist_ips": ["127.0.0.1", "::1"],
-    "whitelist_ports": [22, 80, 443, 53, 25],
+    "whitelist_ports": [22, 80, 443, 53, 25, 111, 631, 5432, 3306, 5678],  // Expanded for Docker services
     "max_failed_logins": 10,
     "reboot_check_hours": 24
   }
@@ -201,6 +244,49 @@ Set `"enabled": true` in the email section of config.json:
   }
 }
 ```
+
+## 🐳 Docker & Container Integration
+
+The monitoring script now intelligently detects and identifies Docker containers and their services:
+
+### **Supported Container Types**
+
+The script automatically recognizes 25+ common container types:
+- **Development**: n8n, portainer, jenkins, gitlab
+- **Databases**: postgresql, mysql, mariadb, redis, mongodb
+- **Web Services**: nginx, apache, traefik
+- **Media**: plex, jellyfin, sonarr, radarr
+- **Monitoring**: grafana, prometheus, elasticsearch, kibana
+- **And many more...**
+
+### **Port-to-Service Mapping**
+
+Example output showing Docker integration:
+```
+RUNNING SERVICES:
+----------------
+Network Services:
+  ssh: ports 22, 22
+  rpcbind: ports 111, 111
+  n8n: ports 5678, 5678          // ← Automatically detected Docker container
+  postgresql: ports 5432, 5432
+  cups: ports 631, 631
+
+WARNINGS:
+----------
+• [Security] Unexpected open port 5678: process: docker-n8n  // ← Clear identification
+```
+
+### **VM & Container Detection**
+
+The script automatically detects virtualization environments:
+- **QEMU/KVM** (Proxmox VE)
+- **VMware**
+- **Hyper-V**
+- **Docker containers**
+- **Physical hardware**
+
+And adapts monitoring accordingly (e.g., temperature monitoring limitations in VMs).
 
 ## Usage
 

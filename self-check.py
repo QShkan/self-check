@@ -289,33 +289,112 @@ class SystemChecker:
         return results
 
     def check_temperature(self) -> Dict[str, Any]:
-        """Check system temperature (especially important for Raspberry Pi)"""
+        """Check system temperature (works with physical hardware, VMs, and containers)"""
         results = {}
+        temp_found = False
 
         try:
+            # Method 1: psutil sensors (works on physical hardware)
             if hasattr(psutil, 'sensors_temperatures'):
                 temps = psutil.sensors_temperatures()
-                results['temperatures'] = temps
+                if temps:
+                    results['temperatures'] = temps
+                    temp_found = True
 
-                for name, entries in temps.items():
-                    for entry in entries:
-                        if entry.current and entry.current > self.config['thresholds']['temperature']:
-                            self.add_issue("Temperature",
-                                         f"High temperature on {name}: {entry.current}°C")
+                    for name, entries in temps.items():
+                        for entry in entries:
+                            if entry.current and entry.current > self.config['thresholds']['temperature']:
+                                self.add_issue("Temperature",
+                                             f"High temperature on {name}: {entry.current}°C")
 
-            # Raspberry Pi specific temperature check
+            # Method 2: Raspberry Pi specific check
             if os.path.exists('/sys/class/thermal/thermal_zone0/temp'):
                 with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
                     temp = int(f.read().strip()) / 1000.0
                     results['rpi_temperature'] = temp
+                    temp_found = True
 
                     if temp > self.config['thresholds']['temperature']:
                         self.add_issue("Temperature", f"High Raspberry Pi temperature: {temp}°C")
+
+            # Method 3: Check thermal zones (works on many Linux systems)
+            if not temp_found:
+                thermal_zones = []
+                for i in range(10):  # Check thermal_zone0 through thermal_zone9
+                    zone_path = f'/sys/class/thermal/thermal_zone{i}/temp'
+                    if os.path.exists(zone_path):
+                        try:
+                            with open(zone_path, 'r') as f:
+                                temp = int(f.read().strip()) / 1000.0
+                                zone_type_path = f'/sys/class/thermal/thermal_zone{i}/type'
+                                zone_type = 'unknown'
+                                if os.path.exists(zone_type_path):
+                                    with open(zone_type_path, 'r') as f:
+                                        zone_type = f.read().strip()
+
+                                thermal_zones.append({'zone': f'thermal_zone{i}', 'type': zone_type, 'temp': temp})
+
+                                if temp > self.config['thresholds']['temperature']:
+                                    self.add_issue("Temperature",
+                                                 f"High temperature in {zone_type}: {temp}°C")
+                        except:
+                            continue
+
+                if thermal_zones:
+                    results['thermal_zones'] = thermal_zones
+                    temp_found = True
+
+            # Method 4: VM/Container detection and host temperature (if available)
+            vm_detected = self._detect_virtualization()
+            if vm_detected:
+                results['virtualization'] = vm_detected
+                results['temperature_note'] = f"Running in {vm_detected['type']} - host temperature monitoring limited"
+
+            # If no temperature data found, note this in results
+            if not temp_found:
+                results['temperature_note'] = "Temperature monitoring not available (VM/container or no sensors)"
 
         except Exception as e:
             self.logger.debug(f"Temperature check failed: {e}")
 
         return results
+
+    def _detect_virtualization(self) -> Dict[str, str]:
+        """Detect if running in a VM or container"""
+        virt_info = {}
+
+        try:
+            # Check for common virtualization indicators
+            if os.path.exists('/proc/cpuinfo'):
+                with open('/proc/cpuinfo', 'r') as f:
+                    cpuinfo = f.read()
+                    if 'QEMU' in cpuinfo:
+                        virt_info['type'] = 'QEMU/KVM'
+                    elif 'VMware' in cpuinfo:
+                        virt_info['type'] = 'VMware'
+                    elif 'Microsoft' in cpuinfo:
+                        virt_info['type'] = 'Hyper-V'
+
+            # Check for container indicators
+            if os.path.exists('/.dockerenv'):
+                virt_info['type'] = 'Docker'
+            elif os.path.exists('/proc/1/cgroup'):
+                with open('/proc/1/cgroup', 'r') as f:
+                    if 'docker' in f.read():
+                        virt_info['type'] = 'Docker'
+
+            # Check DMI information
+            if os.path.exists('/sys/class/dmi/id/product_name'):
+                with open('/sys/class/dmi/id/product_name', 'r') as f:
+                    product = f.read().strip()
+                    if 'QEMU' in product:
+                        virt_info['type'] = 'QEMU/KVM'
+                        virt_info['product'] = product
+
+        except:
+            pass
+
+        return virt_info
 
     def check_security(self) -> Dict[str, Any]:
         """Check security-related issues"""
@@ -341,6 +420,19 @@ class SystemChecker:
 
         if self.config['security']['check_unusual_processes']:
             results['unusual_processes'] = self._check_unusual_processes()
+
+        # New comprehensive security checks
+        if self.config['security'].get('check_ssh_config', True):
+            results['ssh_config'] = self._check_ssh_config()
+
+        if self.config['security'].get('check_firewall', True):
+            results['firewall'] = self._check_firewall_status()
+
+        if self.config['security'].get('check_file_permissions', True):
+            results['file_permissions'] = self._check_critical_file_permissions()
+
+        if self.config['security'].get('check_system_hardening', True):
+            results['system_hardening'] = self._check_system_hardening()
 
         return results
 
@@ -451,7 +543,148 @@ class SystemChecker:
                             }
         except:
             pass
+
+        # Try to identify service by port using systemctl
+        service_info = self._identify_service_by_port(port)
+        if service_info:
+            return service_info
+
         return {}
+
+    def _identify_service_by_port(self, port: int) -> dict:
+        """Identify service by port using systemctl, Docker, and common port mappings"""
+
+        # First, check for Docker containers using this port
+        try:
+            docker_info = self._check_docker_port(port)
+            if docker_info:
+                return docker_info
+        except:
+            pass
+
+        # Common port to service mappings
+        service_map = {
+            111: 'rpcbind',
+            631: 'cups',
+            5432: 'postgresql',
+            3306: 'mysql',
+            22: 'ssh',
+            80: 'apache2',
+            443: 'apache2',
+            5353: 'avahi-daemon',
+            3551: 'apcupsd',
+            5678: 'n8n'  # Updated based on investigation
+        }
+
+        if port in service_map:
+            service_name = service_map[port]
+            try:
+                # Check if service is running
+                result = subprocess.run(['systemctl', 'is-active', service_name],
+                                      capture_output=True, text=True)
+                if result.returncode == 0:
+                    return {'process': service_name, 'service': service_name}
+
+                # Check for snap services
+                snap_result = subprocess.run(['systemctl', 'list-units', '--type=service', '--state=running'],
+                                           capture_output=True, text=True)
+                for line in snap_result.stdout.split('\n'):
+                    if f'snap.{service_name}' in line or service_name in line:
+                        return {'process': f'snap-{service_name}', 'service': service_name}
+
+            except:
+                pass
+
+            return {'process': service_name, 'service': service_name}
+
+        return {}
+
+    def _check_docker_port(self, port: int) -> dict:
+        """Check if a port is used by a Docker container"""
+        try:
+            # Check if Docker is available (try without sudo first, then with sudo)
+            for docker_cmd in [['docker'], ['sudo', 'docker']]:
+                try:
+                    result = subprocess.run(docker_cmd + ['ps', '--format', '{{.Names}}\t{{.Image}}\t{{.Ports}}'],
+                                          capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0:
+                        for line in result.stdout.split('\n'):
+                            if line and (f':{port}->' in line or f':{port}/' in line):
+                                parts = line.split('\t')
+                                if len(parts) >= 3:
+                                    container_name = parts[0]
+                                    image = parts[1]
+                                    ports = parts[2]
+
+                                    # Extract service name from image or container name
+                                    service_name = self._extract_service_name(image, container_name)
+
+                                    return {
+                                        'process': f'docker-{service_name}',
+                                        'service': service_name,
+                                        'container': container_name,
+                                        'image': image,
+                                        'ports': ports
+                                    }
+                        break  # If docker worked, don't try sudo
+                except (subprocess.TimeoutExpired, FileNotFoundError):
+                    continue  # Try next docker command or give up
+
+        except Exception as e:
+            self.logger.debug(f"Docker port check failed: {e}")
+
+        return {}
+
+    def _extract_service_name(self, image: str, container_name: str) -> str:
+        """Extract a meaningful service name from Docker image or container name"""
+        # Check container name first (often more descriptive)
+        name_lower = container_name.lower()
+
+        # Common service patterns in container names
+        service_patterns = {
+            'n8n': 'n8n',
+            'postgres': 'postgresql',
+            'mysql': 'mysql',
+            'mariadb': 'mysql',
+            'nginx': 'nginx',
+            'apache': 'apache',
+            'redis': 'redis',
+            'mongo': 'mongodb',
+            'elastic': 'elasticsearch',
+            'kibana': 'kibana',
+            'grafana': 'grafana',
+            'prometheus': 'prometheus',
+            'traefik': 'traefik',
+            'portainer': 'portainer',
+            'nextcloud': 'nextcloud',
+            'wordpress': 'wordpress',
+            'jenkins': 'jenkins',
+            'gitlab': 'gitlab',
+            'sonarr': 'sonarr',
+            'radarr': 'radarr',
+            'plex': 'plex',
+            'jellyfin': 'jellyfin'
+        }
+
+        # Check container name for service patterns
+        for pattern, service in service_patterns.items():
+            if pattern in name_lower:
+                return service
+
+        # Fall back to image name analysis
+        image_lower = image.lower()
+        for pattern, service in service_patterns.items():
+            if pattern in image_lower:
+                return service
+
+        # Extract from image name (remove registry and tag)
+        try:
+            service_name = image.split(':')[0].split('/')[-1]
+            # Clean up common suffixes
+            service_name = service_name.replace('-docker', '').replace('_docker', '')
+            return service_name
+        except:
+            return 'unknown'
 
     def _is_system_port(self, port: int, process_name: str) -> bool:
         """Check if a port is a known system service port"""
@@ -674,7 +907,7 @@ class SystemChecker:
             whitelist_ports = set(self.config['security']['whitelist_ports'])
 
             for conn in connections:
-                if conn.status in ['ESTABLISHED', 'LISTEN']:
+                if conn.status == 'ESTABLISHED':
                     suspicious = False
                     reason = ""
 
@@ -706,20 +939,7 @@ class SystemChecker:
                                 suspicious = True
                                 reason = f"Connection to foreign IP {remote_ip}:{remote_port}"
 
-                    # Check for unusual listening ports
-                    elif conn.status == 'LISTEN':
-                        local_port = conn.laddr.port
-                        whitelisted_ports = set(self.config['security'].get('whitelist_ports', [22, 80, 443, 53]))
-                        if local_port not in whitelisted_ports and not self._is_system_port(local_port, self._get_process_name(conn.pid)):
-                            # Get detailed process info
-                            process_details = self._get_detailed_process_info(conn.pid)
-                            process_name = process_details.get('name', 'unknown')
-
-                            # Flag if it's an unusual service
-                            known_services = ['ssh', 'sshd', 'nginx', 'apache2', 'httpd', 'mysqld', 'postgres']
-                            if process_name not in known_services:
-                                suspicious = True
-                                reason = f"Unusual service '{process_name}' listening on port {local_port}"
+                    # Note: Listening port checks are handled by _check_open_ports() to avoid duplication
 
                     if suspicious:
                         process_details = self._get_detailed_process_info(conn.pid)
@@ -876,6 +1096,232 @@ class SystemChecker:
 
         return unusual_processes
 
+    def _check_ssh_config(self) -> Dict[str, Any]:
+        """Check SSH configuration for security issues"""
+        ssh_issues = []
+        ssh_info = {}
+
+        try:
+            # Try to get SSH configuration (try without sudo first, then with sudo)
+            for sshd_cmd in [['sshd', '-T'], ['sudo', 'sshd', '-T']]:
+                try:
+                    result = subprocess.run(sshd_cmd, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0:
+                        ssh_config = {}
+                        for line in result.stdout.split('\n'):
+                            if line.strip() and ' ' in line:
+                                key, value = line.strip().split(' ', 1)
+                                ssh_config[key.lower()] = value.lower()
+
+                        ssh_info['config'] = ssh_config
+
+                        # Check for security issues
+                        if ssh_config.get('permitrootlogin', 'no') not in ['no', 'prohibit-password']:
+                            self.add_issue("Security", "SSH allows root login with password")
+                            ssh_issues.append("root_login_enabled")
+
+                        if ssh_config.get('passwordauthentication', 'no') == 'yes':
+                            self.add_issue("Security", "SSH password authentication enabled")
+                            ssh_issues.append("password_auth_enabled")
+
+                        if ssh_config.get('permitemptypasswords', 'no') == 'yes':
+                            self.add_issue("Security", "SSH allows empty passwords")
+                            ssh_issues.append("empty_passwords_allowed")
+
+                        if ssh_config.get('x11forwarding', 'no') == 'yes':
+                            ssh_issues.append("x11_forwarding_enabled")
+
+                        break  # If sshd worked, don't try sudo
+                except (subprocess.TimeoutExpired, FileNotFoundError):
+                    continue
+
+            # Check for recent SSH authentication failures
+            ssh_failures = self._check_ssh_failures()
+            if ssh_failures:
+                ssh_info['recent_failures'] = ssh_failures
+
+        except Exception as e:
+            self.logger.debug(f"SSH config check failed: {e}")
+
+        ssh_info['issues'] = ssh_issues
+        return ssh_info
+
+    def _check_ssh_failures(self) -> List[str]:
+        """Check for recent SSH authentication failures"""
+        failures = []
+        try:
+            # Try journalctl first, then auth.log
+            log_commands = [
+                ['journalctl', '-u', 'ssh', '-S', '-24h', '-p', 'warning', '--no-pager'],
+                ['sudo', 'journalctl', '-u', 'ssh', '-S', '-24h', '-p', 'warning', '--no-pager']
+            ]
+
+            for cmd in log_commands:
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0 and result.stdout.strip():
+                        failure_lines = [line for line in result.stdout.split('\n')
+                                       if 'Failed password' in line or 'Invalid user' in line]
+                        failures.extend(failure_lines[-10:])  # Last 10 failures
+                        break
+                except:
+                    continue
+
+        except Exception as e:
+            self.logger.debug(f"SSH failures check failed: {e}")
+
+        return failures
+
+    def _check_firewall_status(self) -> Dict[str, Any]:
+        """Check firewall status and configuration"""
+        firewall_info = {}
+
+        try:
+            # Check UFW status
+            try:
+                result = subprocess.run(['ufw', 'status'], capture_output=True, text=True, timeout=10)
+                if result.returncode == 0:
+                    ufw_output = result.stdout.strip()
+                    firewall_info['ufw'] = ufw_output
+
+                    if 'Status: inactive' in ufw_output:
+                        self.add_issue("Security", "UFW firewall is inactive")
+            except FileNotFoundError:
+                firewall_info['ufw'] = 'not_installed'
+
+            # Check iptables rules
+            try:
+                for ipt_cmd in [['iptables', '-S'], ['sudo', 'iptables', '-S']]:
+                    try:
+                        result = subprocess.run(ipt_cmd, capture_output=True, text=True, timeout=10)
+                        if result.returncode == 0:
+                            iptables_rules = result.stdout.strip().split('\n')
+                            firewall_info['iptables_rules'] = len(iptables_rules)
+
+                            # Check if only default ACCEPT policies (potential security issue)
+                            if len(iptables_rules) <= 3 and all('ACCEPT' in rule for rule in iptables_rules):
+                                self.add_issue("Security", "No custom iptables rules found - firewall may be wide open")
+                            break
+                    except:
+                        continue
+            except:
+                pass
+
+        except Exception as e:
+            self.logger.debug(f"Firewall check failed: {e}")
+
+        return firewall_info
+
+    def _check_critical_file_permissions(self) -> Dict[str, Any]:
+        """Check for world-writable directories and SUID/SGID files"""
+        perm_issues = []
+        file_info = {}
+
+        try:
+            # Check for world-writable directories (top level only for performance)
+            try:
+                result = subprocess.run(['sudo', 'find', '/', '-xdev', '-type', 'd', '-perm', '-0002', '-maxdepth', '2'],
+                                      capture_output=True, text=True, timeout=30)
+                if result.returncode == 0:
+                    world_writable = [d for d in result.stdout.strip().split('\n') if d and d not in ['/tmp', '/var/tmp']]
+                    if world_writable:
+                        file_info['world_writable_dirs'] = world_writable[:10]  # Limit to first 10
+                        if len(world_writable) > 2:  # Allow a few expected ones
+                            self.add_issue("Security", f"Found {len(world_writable)} world-writable directories")
+            except:
+                pass
+
+            # Check for SUID/SGID files (common locations only for performance)
+            try:
+                suid_paths = ['/usr/bin', '/usr/sbin', '/bin', '/sbin']
+                suid_files = []
+
+                for path in suid_paths:
+                    try:
+                        result = subprocess.run(['sudo', 'find', path, '-type', 'f', '(', '-perm', '-4000', '-o', '-perm', '-2000', ')'],
+                                              capture_output=True, text=True, timeout=10)
+                        if result.returncode == 0:
+                            suid_files.extend(result.stdout.strip().split('\n'))
+                    except:
+                        continue
+
+                suid_files = [f for f in suid_files if f]  # Remove empty strings
+                file_info['suid_sgid_files'] = len(suid_files)
+
+                # Flag if there are unusual numbers of SUID files
+                if len(suid_files) > 50:
+                    self.add_issue("Security", f"High number of SUID/SGID files found: {len(suid_files)}")
+
+            except:
+                pass
+
+        except Exception as e:
+            self.logger.debug(f"File permissions check failed: {e}")
+
+        file_info['issues'] = perm_issues
+        return file_info
+
+    def _check_system_hardening(self) -> Dict[str, Any]:
+        """Check system hardening settings (sysctl values)"""
+        hardening_info = {}
+        hardening_issues = []
+
+        # Critical security sysctl settings to check
+        security_settings = {
+            'net.ipv4.ip_forward': '0',  # IP forwarding should be disabled
+            'net.ipv4.conf.all.accept_redirects': '0',  # Don't accept ICMP redirects
+            'net.ipv4.conf.all.send_redirects': '0',  # Don't send ICMP redirects
+            'net.ipv4.icmp_echo_ignore_broadcasts': '1',  # Ignore broadcast pings
+            'kernel.randomize_va_space': '2',  # Enable ASLR
+            'kernel.kptr_restrict': '1',  # Restrict kernel pointer access
+            'net.ipv4.conf.all.accept_source_route': '0',  # Don't accept source routing
+            'net.ipv4.conf.all.log_martians': '1',  # Log suspicious packets
+        }
+
+        try:
+            current_settings = {}
+
+            # Get current sysctl values
+            for setting, expected in security_settings.items():
+                try:
+                    result = subprocess.run(['sysctl', '-n', setting],
+                                          capture_output=True, text=True, timeout=5)
+                    if result.returncode == 0:
+                        current_value = result.stdout.strip()
+                        current_settings[setting] = current_value
+
+                        # Check if setting matches expected secure value
+                        if current_value != expected:
+                            issue_desc = f"Insecure sysctl setting: {setting}={current_value} (should be {expected})"
+                            self.add_issue("Security", issue_desc)
+                            hardening_issues.append({
+                                'setting': setting,
+                                'current': current_value,
+                                'expected': expected
+                            })
+                except:
+                    continue
+
+            hardening_info['current_settings'] = current_settings
+            hardening_info['issues'] = hardening_issues
+
+            # Check if kernel has some hardening features
+            try:
+                # Check if KASLR is enabled
+                with open('/proc/cmdline', 'r') as f:
+                    cmdline = f.read()
+                    if 'nokaslr' in cmdline:
+                        self.add_issue("Security", "Kernel ASLR (KASLR) is disabled")
+                        hardening_issues.append({'setting': 'kaslr', 'status': 'disabled'})
+
+            except:
+                pass
+
+        except Exception as e:
+            self.logger.debug(f"System hardening check failed: {e}")
+
+        return hardening_info
+
     def _get_process_baseline(self) -> Set[str]:
         """Get baseline of normal system processes"""
         if self.baseline_file.exists():
@@ -951,6 +1397,46 @@ class SystemChecker:
 
         return service_status
 
+    def get_running_services(self) -> Dict[str, Any]:
+        """Get list of running services for reporting"""
+        services = {'systemd': [], 'listening_ports': []}
+
+        try:
+            # Get systemd services
+            result = subprocess.run(['systemctl', 'list-units', '--type=service', '--state=running', '--no-pager'],
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                for line in result.stdout.split('\n')[1:]:  # Skip header
+                    if '.service' in line and 'loaded active running' in line:
+                        parts = line.split()
+                        if parts:
+                            service_name = parts[0].replace('.service', '')
+                            # Skip system and uninteresting services
+                            if not any(skip in service_name.lower() for skip in
+                                     ['systemd', 'dbus', 'getty', 'user@', 'session-']):
+                                services['systemd'].append(service_name)
+
+            # Get services with listening ports (from open ports check)
+            connections = psutil.net_connections(kind='inet')
+            port_services = {}
+
+            for conn in connections:
+                if conn.status == 'LISTEN':
+                    port = conn.laddr.port
+                    service_info = self._identify_service_by_port(port)
+                    if service_info and service_info.get('service'):
+                        service_name = service_info['service']
+                        if service_name not in port_services:
+                            port_services[service_name] = []
+                        port_services[service_name].append(port)
+
+            services['listening_ports'] = port_services
+
+        except Exception as e:
+            self.logger.debug(f"Get running services failed: {e}")
+
+        return services
+
     def send_email_notification(self, subject: str, body: str):
         """Send email notification for critical issues"""
         if not self.config['email']['enabled']:
@@ -985,7 +1471,6 @@ class SystemChecker:
             # Create HTML email body
             html_body = self._create_html_email(body)
             msg.attach(MIMEText(html_body, 'html'))
-            msg.attach(MIMEText(body, 'plain'))
 
             server = smtplib.SMTP(smtp_server, smtp_port)
 
@@ -1003,42 +1488,49 @@ class SystemChecker:
 
     def _create_html_email(self, plain_body: str) -> str:
         """Create HTML formatted email body"""
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>System Self-Check Alert</title>
-            <style>
-                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }}
-                .container {{ max-width: 800px; margin: 0 auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
-                .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; }}
-                .content {{ padding: 20px; }}
-                .critical {{ background-color: #fee; border-left: 4px solid #d32f2f; padding: 15px; margin: 10px 0; }}
-                .warning {{ background-color: #fff3cd; border-left: 4px solid #f57c00; padding: 15px; margin: 10px 0; }}
-                .success {{ background-color: #e8f5e8; border-left: 4px solid #388e3c; padding: 15px; margin: 10px 0; }}
-                .footer {{ background-color: #f8f9fa; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px; color: #666; }}
-                pre {{ background-color: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 13px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🔒 System Self-Check Alert</h1>
-                    <p>Hostname: {socket.gethostname()} | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-                </div>
-                <div class="content">
-                    <div class="{"critical" if self.issues else "warning" if self.warnings else "success"}">
-                        <h2>{'🚨 Critical Issues Detected' if self.issues else '⚠️ Warnings Found' if self.warnings else '✅ System Healthy'}</h2>
-                        <p>{'Immediate attention required' if self.issues else 'Review recommended' if self.warnings else 'All checks passed'}</p>
-                    </div>
-                    <pre>{plain_body}</pre>
-                </div>
-                <div class="footer">
-                    Generated by Self-Check System Monitor |
-                    <a href="https://github.com/bk86a/self-check">GitHub Repository</a>
-                </div>
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>System Self-Check Alert</title>
+    <style>
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; color: #333; }}
+        .container {{ max-width: 800px; margin: 0 auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; }}
+        .header h1 {{ margin: 0 0 8px 0; padding: 0; font-size: 24px; color: white !important; }}
+        .header p {{ margin: 0; padding: 0; opacity: 0.9; color: white !important; }}
+        .content {{ padding: 20px; color: #333; }}
+        .critical {{ background-color: #fee; border-left: 4px solid #d32f2f; padding: 15px; margin: 10px 0; color: #333; }}
+        .warning {{ background-color: #fff3cd; border-left: 4px solid #f57c00; padding: 15px; margin: 10px 0; color: #333; }}
+        .success {{ background-color: #e8f5e8; border-left: 4px solid #388e3c; padding: 15px; margin: 10px 0; color: #333; }}
+        .critical h2, .warning h2, .success h2 {{ margin: 0 0 8px 0; color: #333; }}
+        .critical p, .warning p, .success p {{ margin: 0; color: #666; }}
+        .footer {{ background-color: #f8f9fa; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px; color: #666; }}
+        pre {{ background-color: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 13px; color: #333; border: 1px solid #e9ecef; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #000000; padding: 20px; border-radius: 8px 8px 0 0;">
+            <h1 style="color: #000000; margin: 0 0 8px 0; padding: 0; font-size: 24px; font-weight: bold;">
+                <font color="#000000">🔒 System Self-Check Alert</font>
+            </h1>
+            <p style="color: #000000; margin: 0; padding: 0;">
+                <font color="#000000">Hostname: {socket.gethostname()} | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</font>
+            </p>
+        </div>
+        <div class="content">
+            <div class="{"critical" if self.issues else "warning" if self.warnings else "success"}">
+                <h2>{'🚨 Critical Issues Detected' if self.issues else '⚠️ Warnings Found' if self.warnings else '✅ System Healthy'}</h2>
+                <p>{'Immediate attention required' if self.issues else 'Review recommended' if self.warnings else 'All checks passed'}</p>
             </div>
+            <pre>{plain_body}</pre>
+        </div>
+        <div class="footer">
+            Generated by Self-Check System Monitor |
+            <a href="https://github.com/bk86a/self-check">GitHub Repository</a>
+        </div>
+    </div>
         </body>
         </html>
         """
@@ -1091,8 +1583,32 @@ class SystemChecker:
             report.append("-" * 10)
             if 'disk_usage' in res:
                 for disk in res['disk_usage']:
-                    report.append(f"Disk {disk['mountpoint']}: {disk['percent']:.1f}% used")
+                    # Skip snap packages in report (they're always 100% by design)
+                    if not disk['mountpoint'].startswith('/snap/'):
+                        report.append(f"Disk {disk['mountpoint']}: {disk['percent']:.1f}% used")
             report.append(f"Internet: {'Connected' if res.get('internet_connectivity') else 'Disconnected'}")
+            report.append("")
+
+        # Running Services Summary
+        if 'running_services' in results:
+            services = results['running_services']
+            report.append("RUNNING SERVICES:")
+            report.append("-" * 16)
+
+            # Show systemd services
+            if services.get('systemd'):
+                systemd_services = services['systemd'][:10]  # Limit to first 10
+                report.append(f"Active Services: {', '.join(systemd_services)}")
+                if len(services['systemd']) > 10:
+                    report.append(f"... and {len(services['systemd']) - 10} more")
+
+            # Show port services
+            if services.get('listening_ports'):
+                report.append("Network Services:")
+                for service, ports in list(services['listening_ports'].items())[:5]:  # Limit to 5
+                    ports_str = ', '.join(map(str, ports))
+                    report.append(f"  {service}: ports {ports_str}")
+
             report.append("")
 
         # Temperature Summary
@@ -1100,8 +1616,32 @@ class SystemChecker:
             temp = results['temperature']
             report.append("TEMPERATURE:")
             report.append("-" * 12)
+
+            # Raspberry Pi temperature
             if 'rpi_temperature' in temp:
                 report.append(f"CPU Temperature: {temp['rpi_temperature']:.1f}°C")
+
+            # Thermal zones
+            elif 'thermal_zones' in temp:
+                for zone in temp['thermal_zones'][:3]:  # Show first 3 zones
+                    report.append(f"{zone['type']}: {zone['temp']:.1f}°C")
+
+            # psutil temperatures
+            elif 'temperatures' in temp:
+                for sensor_name, entries in list(temp['temperatures'].items())[:2]:  # Show first 2 sensors
+                    for entry in entries[:1]:  # Show first entry per sensor
+                        if entry.current:
+                            report.append(f"{sensor_name}: {entry.current:.1f}°C")
+
+            # Virtualization note
+            if 'temperature_note' in temp:
+                report.append(temp['temperature_note'])
+
+            # VM detection info
+            if 'virtualization' in temp:
+                virt = temp['virtualization']
+                report.append(f"Platform: {virt.get('type', 'Virtual Machine')}")
+
             report.append("")
 
         if not self.issues and not self.warnings:
@@ -1135,6 +1675,9 @@ class SystemChecker:
 
             if self.config['checks']['services']:
                 results['services'] = self.check_services()
+
+            # Always collect running services for reporting
+            results['running_services'] = self.get_running_services()
 
             # Save current state for next comparison
             current_state = {
