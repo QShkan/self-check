@@ -1,0 +1,14 @@
+[Unit]
+Description=System Self-Check Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/self-check.py --config /etc/self-check/config.json --quiet
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

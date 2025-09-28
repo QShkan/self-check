@@ -1,0 +1,55 @@
+{
+  "thresholds": {
+    "cpu_usage": 85.0,
+    "memory_usage": 90.0,
+    "disk_usage": 90.0,
+    "load_average": null,
+    "temperature": 75.0,
+    "swap_usage": 50.0
+  },
+  "email": {
+    "enabled": false,
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "username": "",
+    "password": "",
+    "from_email": "",
+    "to_email": "michal@osmenda.com",
+    "use_tls": true,
+    "use_env_vars": true
+  },
+  "checks": {
+    "performance": true,
+    "resources": true,
+    "security": true,
+    "temperature": true,
+    "services": true
+  },
+  "security": {
+    "check_failed_logins": true,
+    "check_open_ports": true,
+    "check_updates": true,
+    "check_ssh_keys": true,
+    "check_reboots": true,
+    "check_suspicious_connections": true,
+    "check_unusual_processes": true,
+    "suspicious_processes": [],
+    "whitelist_ips": ["127.0.0.1", "::1"],
+    "whitelist_ports": [22, 80, 443, 53, 25, 993, 995],
+    "max_failed_logins": 10,
+    "reboot_check_hours": 24,
+    "connection_monitoring": true
+  },
+  "services": {
+    "critical_services": ["ssh", "cron"],
+    "check_systemd": true
+  },
+  "expected_ports": [22, 80, 443, 53, 25],
+  "debug": false,
+  "quiet": false,
+  "performance": {
+    "max_execution_time": 30,
+    "cache_timeout": 300,
+    "lightweight_mode": false
+  }
+}
