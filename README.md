@@ -91,6 +91,32 @@ sudo ./install.sh
 
 Edit `config.json` to customize thresholds and enable email notifications:
 
+### Port Whitelisting
+
+To prevent false positives for legitimate services, add ports to the whitelist:
+
+```json
+{
+  "security": {
+    "whitelist_ports": [
+      22,    // SSH
+      80,    // HTTP
+      443,   // HTTPS
+      53,    // DNS
+      25,    // SMTP
+      111,   // RPC portmapper
+      631,   // CUPS printing
+      5432,  // PostgreSQL
+      3306,  // MySQL
+      6379,  // Redis
+      27017  // MongoDB
+    ]
+  }
+}
+```
+
+### Basic Configuration
+
 ```json
 {
   "thresholds": {
@@ -245,10 +271,16 @@ sudo systemctl list-timers | grep self-check
 
 ### Security
 - **Failed login attempts** (from auth.log with configurable threshold)
-- **Suspicious network connections** (foreign IPs, unusual ports, unknown services)
+- **Enhanced network monitoring**:
+  - Foreign IP connections with process identification
+  - Unusual ports with detailed process information (name, PID, user, command line)
+  - Smart whitelisting for known safe processes (browsers, updates, etc.)
 - **Unexpected system reboots** (detects unplanned restarts)
 - **Unusual processes** (new processes not in baseline, high CPU usage)
-- **Open network ports** (unexpected listening services)
+- **Smart port monitoring**:
+  - Detailed process information for all listening ports
+  - Configurable port whitelisting
+  - Automatic detection of common system services
 - **SSH key file permissions** (ensures proper security)
 - **Available system updates** (tracks pending security patches)
 

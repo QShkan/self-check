@@ -375,7 +375,7 @@ class SystemChecker:
         return failed_logins
 
     def _check_open_ports(self) -> List[Dict]:
-        """Check for open network ports"""
+        """Check for open network ports with detailed process information"""
         open_ports = []
 
         try:
@@ -387,26 +387,45 @@ class SystemChecker:
                     port_info = {
                         'port': conn.laddr.port,
                         'address': conn.laddr.ip,
-                        'pid': conn.pid
+                        'pid': conn.pid,
+                        'process': 'unknown',
+                        'cmdline': '',
+                        'user': ''
                     }
 
                     if conn.pid:
                         try:
                             process = psutil.Process(conn.pid)
                             port_info['process'] = process.name()
-                        except:
+                            port_info['cmdline'] = ' '.join(process.cmdline())
+                            port_info['user'] = process.username()
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
                             port_info['process'] = 'unknown'
+                    else:
+                        # Try to get process info from netstat if psutil fails
+                        try:
+                            netstat_info = self._get_port_process_netstat(conn.laddr.port)
+                            if netstat_info:
+                                port_info.update(netstat_info)
+                        except:
+                            pass
 
                     listening_ports.append(port_info)
 
-            # Check for unexpected open ports
-            expected_ports = self.config.get('expected_ports', [22, 80, 443])
+            # Check for unexpected open ports using whitelist
+            whitelisted_ports = set(self.config['security'].get('whitelist_ports', [22, 80, 443, 53]))
+            expected_ports = set(self.config.get('expected_ports', [22, 80, 443]))
+            all_allowed_ports = whitelisted_ports | expected_ports
+
             for port_info in listening_ports:
-                if port_info['port'] not in expected_ports and port_info['port'] > 1024:
-                    self.add_issue("Security",
-                                 f"Unexpected open port: {port_info['port']} "
-                                 f"(process: {port_info.get('process', 'unknown')})",
-                                 "warning")
+                port = port_info['port']
+                if port not in all_allowed_ports:
+                    # Additional filtering for very common system ports
+                    if not self._is_system_port(port, port_info['process']):
+                        process_details = self._format_process_details(port_info)
+                        self.add_issue("Security",
+                                     f"Unexpected open port {port}: {process_details}",
+                                     "warning")
 
             open_ports = listening_ports
 
@@ -414,6 +433,79 @@ class SystemChecker:
             self.logger.debug(f"Open ports check failed: {e}")
 
         return open_ports
+
+    def _get_port_process_netstat(self, port: int) -> dict:
+        """Get process information for a port using netstat as fallback"""
+        try:
+            result = subprocess.run(['netstat', '-tlnp'], capture_output=True, text=True)
+            for line in result.stdout.split('\n'):
+                if f':{port} ' in line and 'LISTEN' in line:
+                    parts = line.split()
+                    if len(parts) >= 7:
+                        process_info = parts[6]
+                        if '/' in process_info:
+                            pid, process_name = process_info.split('/', 1)
+                            return {
+                                'pid': int(pid) if pid.isdigit() else None,
+                                'process': process_name
+                            }
+        except:
+            pass
+        return {}
+
+    def _is_system_port(self, port: int, process_name: str) -> bool:
+        """Check if a port is a known system service port"""
+        # Well-known system ports that should not be flagged
+        system_ports = {
+            111: ['rpcbind', 'portmapper'],
+            631: ['cupsd', 'cups'],
+            5353: ['avahi-daemon', 'mdnsd'],
+            68: ['dhclient', 'dhcp'],
+            123: ['ntpd', 'chrony'],
+            323: ['chronyd'],
+            514: ['rsyslog', 'syslog'],
+            6000: ['X11', 'Xorg'],
+            5432: ['postgres', 'postgresql'],
+            3306: ['mysql', 'mysqld'],
+            6379: ['redis', 'redis-server'],
+            27017: ['mongod', 'mongodb'],
+            9200: ['elasticsearch'],
+            5672: ['rabbitmq'],
+            8080: ['tomcat', 'jetty'],
+            3000: ['node', 'nodejs'],
+            8000: ['python', 'django'],
+            4000: ['ruby', 'rails']
+        }
+
+        if port in system_ports:
+            allowed_processes = system_ports[port]
+            return any(proc in process_name.lower() for proc in allowed_processes)
+
+        # High ephemeral ports are often temporary
+        if port > 32768:
+            return True
+
+        return False
+
+    def _format_process_details(self, port_info: dict) -> str:
+        """Format process details for reporting"""
+        details = []
+
+        if port_info.get('process', 'unknown') != 'unknown':
+            details.append(f"process: {port_info['process']}")
+
+        if port_info.get('pid'):
+            details.append(f"PID: {port_info['pid']}")
+
+        if port_info.get('user'):
+            details.append(f"user: {port_info['user']}")
+
+        if port_info.get('cmdline') and len(port_info['cmdline']) > 0:
+            # Truncate long command lines
+            cmdline = port_info['cmdline'][:60] + '...' if len(port_info['cmdline']) > 60 else port_info['cmdline']
+            details.append(f"cmd: {cmdline}")
+
+        return ' | '.join(details) if details else 'unknown process'
 
     def _check_updates(self) -> Dict[str, Any]:
         """Check for available system updates"""
@@ -608,39 +700,49 @@ class SystemChecker:
 
                         # Check for foreign IP connections (basic geolocation check)
                         if self._is_foreign_ip(remote_ip):
-                            suspicious = True
-                            reason = f"Connection to foreign IP {remote_ip}:{remote_port}"
+                            # Check if it's a known safe process
+                            process_name = self._get_process_name(conn.pid)
+                            if not self._is_safe_foreign_connection(process_name, remote_port):
+                                suspicious = True
+                                reason = f"Connection to foreign IP {remote_ip}:{remote_port}"
 
                     # Check for unusual listening ports
                     elif conn.status == 'LISTEN':
                         local_port = conn.laddr.port
-                        if local_port not in whitelist_ports and local_port > 1024:
-                            # Get process info
-                            process_name = "unknown"
-                            if conn.pid:
-                                try:
-                                    process = psutil.Process(conn.pid)
-                                    process_name = process.name()
-                                except:
-                                    pass
+                        whitelisted_ports = set(self.config['security'].get('whitelist_ports', [22, 80, 443, 53]))
+                        if local_port not in whitelisted_ports and not self._is_system_port(local_port, self._get_process_name(conn.pid)):
+                            # Get detailed process info
+                            process_details = self._get_detailed_process_info(conn.pid)
+                            process_name = process_details.get('name', 'unknown')
 
                             # Flag if it's an unusual service
-                            if process_name not in ['ssh', 'sshd', 'nginx', 'apache2', 'httpd']:
+                            known_services = ['ssh', 'sshd', 'nginx', 'apache2', 'httpd', 'mysqld', 'postgres']
+                            if process_name not in known_services:
                                 suspicious = True
-                                reason = f"Unusual service listening on port {local_port}"
+                                reason = f"Unusual service '{process_name}' listening on port {local_port}"
 
                     if suspicious:
+                        process_details = self._get_detailed_process_info(conn.pid)
                         conn_info = {
                             'local_addr': f"{conn.laddr.ip}:{conn.laddr.port}",
                             'remote_addr': f"{conn.raddr.ip}:{conn.raddr.port}" if hasattr(conn, 'raddr') and conn.raddr else "N/A",
                             'status': conn.status,
                             'pid': conn.pid,
-                            'process': self._get_process_name(conn.pid),
+                            'process': process_details.get('name', 'unknown'),
+                            'user': process_details.get('user', ''),
+                            'cmdline': process_details.get('cmdline', ''),
                             'reason': reason
                         }
                         suspicious_connections.append(conn_info)
 
-                        self.add_issue("Security", f"Suspicious connection: {reason}", "warning")
+                        # Enhanced reporting with process details
+                        process_info = f"{process_details.get('name', 'unknown')}"
+                        if process_details.get('user'):
+                            process_info += f" (user: {process_details['user']})"
+                        if conn.pid:
+                            process_info += f" [PID: {conn.pid}]"
+
+                        self.add_issue("Security", f"Suspicious connection: {reason} - {process_info}", "warning")
 
         except Exception as e:
             self.logger.debug(f"Suspicious connections check failed: {e}")
@@ -663,6 +765,32 @@ class SystemChecker:
         except:
             return False
 
+    def _is_safe_foreign_connection(self, process_name: str, port: int) -> bool:
+        """Check if a foreign connection is from a safe/expected process"""
+        safe_processes = {
+            'claude': [443, 80],  # Claude connecting to Anthropic servers
+            'firefox': [443, 80],
+            'chrome': [443, 80],
+            'curl': [443, 80],
+            'wget': [443, 80],
+            'git': [443, 80, 22],
+            'ssh': [22],
+            'ping': [],  # Ping can connect to any IP
+            'ntp': [123],
+            'ntpd': [123],
+            'update': [443, 80],
+            'apt': [443, 80],
+            'yum': [443, 80],
+            'dnf': [443, 80]
+        }
+
+        process_lower = process_name.lower()
+        for safe_proc, allowed_ports in safe_processes.items():
+            if safe_proc in process_lower:
+                return not allowed_ports or port in allowed_ports
+
+        return False
+
     def _get_process_name(self, pid: Optional[int]) -> str:
         """Get process name from PID with caching"""
         if not pid:
@@ -678,6 +806,22 @@ class SystemChecker:
             return name
         except:
             return "unknown"
+
+    def _get_detailed_process_info(self, pid: Optional[int]) -> dict:
+        """Get detailed process information"""
+        if not pid:
+            return {'name': 'unknown', 'cmdline': '', 'user': ''}
+
+        try:
+            process = psutil.Process(pid)
+            return {
+                'name': process.name(),
+                'cmdline': ' '.join(process.cmdline()),
+                'user': process.username(),
+                'pid': pid
+            }
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return {'name': 'unknown', 'cmdline': '', 'user': '', 'pid': pid}
 
     def _check_unusual_processes(self) -> List[Dict]:
         """Check for unusual or suspicious processes"""
