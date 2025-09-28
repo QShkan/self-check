@@ -14,7 +14,7 @@
     "username": "",
     "password": "",
     "from_email": "",
-    "to_email": "michal@osmenda.com",
+    "to_email": "admin@example.com",
     "use_tls": true,
     "use_env_vars": true
   },

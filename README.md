@@ -125,7 +125,7 @@ export SMTP_PORT=587
 export SMTP_USER=your-email@gmail.com
 export SMTP_PASSWORD=your-app-password
 export EMAIL_FROM=your-email@gmail.com
-export EMAIL_TO=michal@osmenda.com
+export EMAIL_TO=admin@example.com
 ```
 
 #### Gmail Setup
@@ -134,7 +134,7 @@ For Gmail accounts:
 1. Enable 2-factor authentication on your Google account
 2. Generate an app password (not your regular password)
 3. Use the app password as `SMTP_PASSWORD`
-4. Emails will be sent to `michal@osmenda.com` as configured
+4. Configure `EMAIL_TO` with your desired notification email address
 
 #### Enable Email Notifications
 
