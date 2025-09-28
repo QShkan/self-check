@@ -72,5 +72,13 @@
     "max_execution_time": 30,
     "cache_timeout": 300,
     "lightweight_mode": false
+  },
+  "baseline": {
+    "enabled": true,
+    "file": "baseline.json",
+    "pattern_matching": true,
+    "auto_expire_days": 30,
+    "categories": ["Security", "Performance", "Resources", "Temperature", "Services"],
+    "comment": "Baseline system prevents known/accepted issues from triggering alerts"
   }
 }

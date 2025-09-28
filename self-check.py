@@ -35,8 +35,11 @@ class SystemChecker:
         self.cache_dir = Path("/tmp/self-check-cache")
         self.cache_dir.mkdir(exist_ok=True)
         self.state_file = self.cache_dir / "system_state.json"
-        self.baseline_file = self.cache_dir / "baseline.json"
+        self.baseline_file = Path(self.config.get('baseline', {}).get('file', 'baseline.json'))
+        if not self.baseline_file.is_absolute():
+            self.baseline_file = Path.cwd() / self.baseline_file
         self.previous_state = self.load_previous_state()
+        self.baseline = self.load_baseline()
 
         # Performance optimization: cache heavy operations
         self._process_cache = {}
@@ -184,14 +187,188 @@ class SystemChecker:
         except Exception as e:
             self.logger.debug(f"Could not save cache {cache_key}: {e}")
 
+    def load_baseline(self) -> Dict[str, Any]:
+        """Load baseline from file"""
+        if not self.baseline_file.exists():
+            return {"issues": [], "warnings": [], "created": None, "updated": None}
+
+        try:
+            with open(self.baseline_file, 'r') as f:
+                baseline = json.load(f)
+                # Clean expired entries if auto_expire_days is set
+                if self.config.get('baseline', {}).get('auto_expire_days'):
+                    baseline = self._clean_expired_baseline(baseline)
+                return baseline
+        except Exception as e:
+            self.logger.error(f"Could not load baseline: {e}")
+            return {"issues": [], "warnings": [], "created": None, "updated": None}
+
+    def save_baseline(self, force_update: bool = False):
+        """Save current issues and warnings as baseline"""
+        baseline = {
+            "issues": [self._normalize_issue_for_baseline(issue) for issue in self.issues],
+            "warnings": [self._normalize_issue_for_baseline(issue) for issue in self.warnings],
+            "created": datetime.now().isoformat() if not self.baseline.get('created') or force_update else self.baseline.get('created'),
+            "updated": datetime.now().isoformat()
+        }
+
+        try:
+            with open(self.baseline_file, 'w') as f:
+                json.dump(baseline, f, indent=2)
+            self.logger.info(f"Baseline saved to {self.baseline_file}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Could not save baseline: {e}")
+            return False
+
+    def update_baseline(self):
+        """Add current issues to existing baseline (merge)"""
+        current_baseline_issues = set()
+        current_baseline_warnings = set()
+
+        # Convert existing baseline to sets for comparison
+        for issue in self.baseline.get('issues', []):
+            current_baseline_issues.add(self._issue_to_key(issue))
+        for warning in self.baseline.get('warnings', []):
+            current_baseline_warnings.add(self._issue_to_key(warning))
+
+        # Add new issues that aren't already in baseline
+        new_issues = []
+        new_warnings = []
+
+        for issue in self.issues:
+            if self._issue_to_key(issue) not in current_baseline_issues:
+                new_issues.append(self._normalize_issue_for_baseline(issue))
+
+        for warning in self.warnings:
+            if self._issue_to_key(warning) not in current_baseline_warnings:
+                new_warnings.append(self._normalize_issue_for_baseline(warning))
+
+        if new_issues or new_warnings:
+            baseline = {
+                "issues": self.baseline.get('issues', []) + new_issues,
+                "warnings": self.baseline.get('warnings', []) + new_warnings,
+                "created": self.baseline.get('created', datetime.now().isoformat()),
+                "updated": datetime.now().isoformat()
+            }
+
+            try:
+                with open(self.baseline_file, 'w') as f:
+                    json.dump(baseline, f, indent=2)
+                self.logger.info(f"Baseline updated with {len(new_issues)} new issues and {len(new_warnings)} new warnings")
+                return True
+            except Exception as e:
+                self.logger.error(f"Could not update baseline: {e}")
+                return False
+        else:
+            self.logger.info("No new issues to add to baseline")
+            return True
+
+    def clear_baseline(self):
+        """Clear the baseline file"""
+        try:
+            if self.baseline_file.exists():
+                self.baseline_file.unlink()
+            self.baseline = {"issues": [], "warnings": [], "created": None, "updated": None}
+            self.logger.info("Baseline cleared")
+            return True
+        except Exception as e:
+            self.logger.error(f"Could not clear baseline: {e}")
+            return False
+
+    def _normalize_issue_for_baseline(self, issue: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize issue for baseline storage (remove timestamp, add pattern if needed)"""
+        normalized = {
+            "category": issue["category"],
+            "description": issue["description"],
+            "severity": issue["severity"]
+        }
+
+        # Add pattern for pattern matching if enabled
+        if self.config.get('baseline', {}).get('pattern_matching', True):
+            normalized["pattern"] = self._create_pattern(issue["description"])
+
+        return normalized
+
+    def _create_pattern(self, description: str) -> str:
+        """Create a regex pattern from issue description for flexible matching"""
+        # Replace numbers with \d+ for flexible matching
+        pattern = re.sub(r'\b\d+\.?\d*\b', r'\\d+(?:\\.\\d+)?', description)
+        # Replace timestamps with generic pattern
+        pattern = re.sub(r'\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}', r'\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}', pattern)
+        # Escape special regex characters but preserve our patterns
+        pattern = re.escape(pattern).replace(r'\\d\+\(\?\:\\\\\.\\\\d\+\)\?', r'\\d+(?:\\.\\d+)?').replace(r'\\\\d\{4\}\\-\\\\d\{2\}\\-\\\\d\{2\}\[T \]\\\\d\{2\}\\:\\\\d\{2\}\\:\\\\d\{2\}', r'\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}')
+        return pattern
+
+    def _issue_to_key(self, issue: Dict[str, Any]) -> str:
+        """Convert issue to a key for comparison"""
+        return f"{issue['category']}|{issue['description']}|{issue['severity']}"
+
+    def _clean_expired_baseline(self, baseline: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove expired entries from baseline"""
+        expire_days = self.config.get('baseline', {}).get('auto_expire_days', 30)
+        if not expire_days or not baseline.get('updated'):
+            return baseline
+
+        try:
+            updated_date = datetime.fromisoformat(baseline['updated'])
+            if datetime.now() - updated_date > timedelta(days=expire_days):
+                self.logger.info(f"Baseline expired (older than {expire_days} days), clearing")
+                return {"issues": [], "warnings": [], "created": None, "updated": None}
+        except Exception as e:
+            self.logger.debug(f"Could not check baseline expiration: {e}")
+
+        return baseline
+
+    def _is_issue_in_baseline(self, issue: Dict[str, Any]) -> bool:
+        """Check if an issue matches any entry in the baseline"""
+        if not self.config.get('baseline', {}).get('enabled', True):
+            return False
+
+        baseline_category = self.config.get('baseline', {}).get('categories', [])
+        if baseline_category and issue['category'] not in baseline_category:
+            return False
+
+        severity_key = 'issues' if issue['severity'] == 'critical' else 'warnings'
+        baseline_items = self.baseline.get(severity_key, [])
+
+        for baseline_item in baseline_items:
+            # Exact match
+            if (baseline_item['category'] == issue['category'] and
+                baseline_item['description'] == issue['description'] and
+                baseline_item['severity'] == issue['severity']):
+                return True
+
+            # Pattern match if enabled
+            if (self.config.get('baseline', {}).get('pattern_matching', True) and
+                baseline_item.get('pattern') and
+                baseline_item['category'] == issue['category'] and
+                baseline_item['severity'] == issue['severity']):
+                try:
+                    if re.match(baseline_item['pattern'], issue['description']):
+                        return True
+                except re.error:
+                    # Invalid regex, fall back to exact match
+                    continue
+
+        return False
+
     def add_issue(self, category: str, description: str, severity: str = "critical"):
-        """Add an issue to the list"""
+        """Add an issue to the list, checking against baseline if enabled"""
         issue = {
             "category": category,
             "description": description,
             "severity": severity,
             "timestamp": datetime.now().isoformat()
         }
+
+        # Check if this issue is in the baseline (and should be suppressed)
+        if hasattr(self, 'ignore_baseline') and self.ignore_baseline:
+            # Force add the issue (ignore baseline mode)
+            pass
+        elif self._is_issue_in_baseline(issue):
+            self.logger.debug(f"SUPPRESSED (in baseline): [{category}] {description}")
+            return
 
         if severity == "critical":
             self.issues.append(issue)
@@ -921,7 +1098,7 @@ class SystemChecker:
                             continue
 
                         # Check for connections to unusual high ports
-                        if remote_port > 49152 and remote_port not in whitelist_ports:
+                        if remote_port > 55000 and remote_port not in whitelist_ports:
                             suspicious = True
                             reason = f"Connection to unusual high port {remote_port}"
 
@@ -1324,9 +1501,10 @@ class SystemChecker:
 
     def _get_process_baseline(self) -> Set[str]:
         """Get baseline of normal system processes"""
-        if self.baseline_file.exists():
+        process_baseline_file = self.cache_dir / "process_baseline.json"
+        if process_baseline_file.exists():
             try:
-                with open(self.baseline_file, 'r') as f:
+                with open(process_baseline_file, 'r') as f:
                     data = json.load(f)
                     return set(data.get('processes', []))
             except Exception:
@@ -1342,8 +1520,9 @@ class SystemChecker:
     def _update_process_baseline(self, current_processes: Dict):
         """Update process baseline with current processes"""
         try:
+            process_baseline_file = self.cache_dir / "process_baseline.json"
             baseline_data = {'processes': list(set(proc['name'] for proc in current_processes.values()))}
-            with open(self.baseline_file, 'w') as f:
+            with open(process_baseline_file, 'w') as f:
                 json.dump(baseline_data, f)
         except Exception as e:
             self.logger.debug(f"Could not update process baseline: {e}")
@@ -1725,6 +1904,20 @@ def main():
     parser.add_argument('--create-config', action='store_true',
                        help='Create default configuration file')
 
+    # Baseline management arguments
+    baseline_group = parser.add_mutually_exclusive_group()
+    baseline_group.add_argument('--save-baseline', action='store_true',
+                               help='Save current issues as baseline')
+    baseline_group.add_argument('--update-baseline', action='store_true',
+                               help='Add current issues to existing baseline')
+    baseline_group.add_argument('--clear-baseline', action='store_true',
+                               help='Clear the baseline file')
+    baseline_group.add_argument('--show-baseline', action='store_true',
+                               help='Show current baseline')
+
+    parser.add_argument('--ignore-baseline', action='store_true',
+                       help='Ignore baseline and report all issues (force mode)')
+
     args = parser.parse_args()
 
     if args.create_config:
@@ -1736,7 +1929,59 @@ def main():
 
     try:
         checker = SystemChecker(args.config)
+
+        # Handle baseline management commands
+        if args.show_baseline:
+            if checker.baseline_file.exists():
+                with open(checker.baseline_file, 'r') as f:
+                    baseline = json.load(f)
+                print(f"Baseline file: {checker.baseline_file}")
+                print(f"Created: {baseline.get('created', 'Unknown')}")
+                print(f"Updated: {baseline.get('updated', 'Unknown')}")
+                print(f"Issues: {len(baseline.get('issues', []))}")
+                print(f"Warnings: {len(baseline.get('warnings', []))}")
+                if baseline.get('issues') or baseline.get('warnings'):
+                    print("\nBaseline contents:")
+                    for issue in baseline.get('issues', []):
+                        print(f"  [CRITICAL] {issue['category']}: {issue['description']}")
+                    for warning in baseline.get('warnings', []):
+                        print(f"  [WARNING] {warning['category']}: {warning['description']}")
+                else:
+                    print("Baseline is empty")
+            else:
+                print(f"No baseline file found at {checker.baseline_file}")
+            return
+
+        if args.clear_baseline:
+            if checker.clear_baseline():
+                print("Baseline cleared successfully")
+            else:
+                print("Failed to clear baseline")
+                sys.exit(1)
+            return
+
+        # Set ignore baseline flag if specified
+        if args.ignore_baseline:
+            checker.ignore_baseline = True
+
+        # Run the checks
         results = checker.run_checks()
+
+        # Handle baseline save/update after checks
+        if args.save_baseline:
+            if checker.save_baseline(force_update=True):
+                print(f"Baseline saved successfully to {checker.baseline_file}")
+                print(f"Saved {len(checker.issues)} issues and {len(checker.warnings)} warnings")
+            else:
+                print("Failed to save baseline")
+                sys.exit(1)
+
+        if args.update_baseline:
+            if checker.update_baseline():
+                print(f"Baseline updated successfully")
+            else:
+                print("Failed to update baseline")
+                sys.exit(1)
 
         if args.output:
             with open(args.output, 'w') as f:

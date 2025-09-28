@@ -1,14 +1,21 @@
 [Unit]
 Description=System Self-Check Monitor
-After=network-online.target
+Documentation=man:self-check(1)
+After=multi-user.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/self-check.py --config /etc/self-check/config.json --quiet
 User=root
+Group=root
+WorkingDirectory=/path/to/self-check
+ExecStartPre=/bin/mkdir -p /tmp/self-check-cache
+ExecStart=/usr/bin/python3 /path/to/self-check/self-check.py --quiet
 StandardOutput=journal
 StandardError=journal
+TimeoutStartSec=120
+SuccessExitStatus=0 1
+RemainAfterExit=no
 
 [Install]
 WantedBy=multi-user.target

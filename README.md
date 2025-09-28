@@ -2,7 +2,21 @@
 
 A comprehensive, enterprise-grade system monitoring script for performance, resources, and security checks. Designed to work across multiple architectures including VMs, Raspberry Pi, and cloud instances, with professional HTML email notifications and Docker container detection.
 
-## 🚀 Latest Features (v2.0)
+## 🚀 Latest Features (v3.0)
+
+### **🎯 Intelligent Baseline System**
+- **Smart Issue Suppression**: Accept known issues as baseline to prevent alert fatigue
+- **Pattern Matching**: Automatically handle dynamic content (ports, PIDs, timestamps)
+- **Baseline Management**: Save, update, clear, and view accepted system states
+- **Auto-expiration**: Optional baseline aging for security freshness
+- **Category Filtering**: Apply baselines to specific issue types
+
+### **⚡ Enhanced Automation**
+- **Systemd Integration**: Professional service management with automatic restart
+- **Optimized Scheduling**: Every 5 minutes with intelligent caching
+- **Root Privilege Execution**: Comprehensive system access for thorough monitoring
+- **Background Operation**: Continuous monitoring without user intervention
+- **Log Integration**: Full journald logging for audit trails
 
 ### **🔒 Enhanced Security Monitoring**
 - **SSH Configuration Analysis**: Detects insecure SSH settings (root login, password auth, empty passwords)
@@ -197,6 +211,13 @@ To prevent false positives for legitimate services, add ports to the whitelist:
     "whitelist_ports": [22, 80, 443, 53, 25, 111, 631, 5432, 3306, 5678],  // Expanded for Docker services
     "max_failed_logins": 10,
     "reboot_check_hours": 24
+  },
+  "baseline": {
+    "enabled": true,
+    "file": "baseline.json",
+    "pattern_matching": true,
+    "auto_expire_days": 30,
+    "categories": ["Security", "Performance", "Resources", "Temperature", "Services"]
   }
 }
 ```
@@ -287,6 +308,87 @@ The script automatically detects virtualization environments:
 - **Physical hardware**
 
 And adapts monitoring accordingly (e.g., temperature monitoring limitations in VMs).
+
+## 🎯 Baseline System
+
+### **Intelligent Alert Management**
+
+The baseline system eliminates alert fatigue by allowing you to "accept" known issues as normal system state. This prevents repeated notifications for the same acceptable conditions while still alerting on genuinely new problems.
+
+### **Key Features**
+
+- **Smart Suppression**: Issues matching the baseline won't trigger email alerts
+- **Pattern Matching**: Handles dynamic content like port numbers, PIDs, and timestamps
+- **Flexible Management**: Save, update, view, and clear baselines as needed
+- **Category Filtering**: Apply baselines only to specific issue types
+- **Auto-expiration**: Optional aging to ensure security freshness
+
+### **Baseline Commands**
+
+```bash
+# Save current issues as accepted baseline
+python3 self-check.py --save-baseline
+
+# Add new issues to existing baseline (merge)
+python3 self-check.py --update-baseline
+
+# View current baseline contents
+python3 self-check.py --show-baseline
+
+# Clear all baseline entries
+python3 self-check.py --clear-baseline
+
+# Force all alerts (ignore baseline)
+python3 self-check.py --ignore-baseline
+```
+
+### **Example Workflow**
+
+1. **Initial Setup**: Run a check to see current issues
+   ```bash
+   python3 self-check.py
+   ```
+
+2. **Accept Known Issues**: If you're comfortable with the current state
+   ```bash
+   python3 self-check.py --save-baseline
+   ```
+
+3. **Future Monitoring**: Only new/changed issues will trigger alerts
+   ```bash
+   python3 self-check.py  # Clean output: "✓ All checks passed"
+   ```
+
+4. **Review Baseline**: Check what's been accepted
+   ```bash
+   python3 self-check.py --show-baseline
+   ```
+
+### **Baseline Configuration**
+
+```json
+{
+  "baseline": {
+    "enabled": true,                    // Enable/disable baseline system
+    "file": "baseline.json",           // Baseline storage file
+    "pattern_matching": true,          // Enable flexible pattern matching
+    "auto_expire_days": 30,           // Auto-clear after N days (optional)
+    "categories": [                   // Which issue types to baseline
+      "Security", "Performance", "Resources", "Temperature", "Services"
+    ]
+  }
+}
+```
+
+### **Pattern Matching Examples**
+
+The baseline system automatically creates flexible patterns for dynamic content:
+
+- `"Found 6 world-writable directories"` → Matches any number of directories
+- `"Suspicious connection to port 59979"` → Matches any high port number
+- `"Process detected: nginx (PID: 1234)"` → Matches any PID for nginx
+
+This ensures that similar issues with different details are properly suppressed.
 
 ## Usage
 
