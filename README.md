@@ -23,9 +23,34 @@ A comprehensive system monitoring script for performance, resources, and securit
 
 ## Requirements
 
-- Python 3.6+
-- `psutil` library
-- Root/sudo access for some security checks
+### System Requirements
+- **Operating System**: Linux (any distribution)
+- **Architecture**: x86_64, ARM, AArch64 (including Raspberry Pi)
+- **Python**: 3.6 or higher
+- **Privileges**: Root/sudo access for comprehensive monitoring
+- **Disk Space**: ~50MB for installation and caching
+
+### Dependencies
+
+**Required:**
+- `python3` (3.6+)
+- `psutil` Python library
+- Standard Linux utilities (`ps`, `df`, `free`, etc.)
+
+**Optional (enhances monitoring):**
+- `systemctl` - for systemd service management
+- `netstat`/`lsof` - for network monitoring
+- `last` - for reboot history
+- System log files (`/var/log/auth.log`, `/var/log/syslog`)
+
+### Dependency Check
+
+Before installation, verify all requirements:
+```bash
+python3 check-requirements.py
+```
+
+This will check your system and provide specific installation commands if anything is missing.
 
 ## Installation
 
@@ -36,7 +61,10 @@ A comprehensive system monitoring script for performance, resources, and securit
 git clone https://github.com/bk86a/self-check.git
 cd self-check
 
-# Install dependencies
+# Check system requirements
+python3 check-requirements.py
+
+# Install dependencies (if needed)
 pip3 install psutil
 
 # Make the script executable
@@ -303,25 +331,125 @@ Logs are written to `/var/log/self-check.log` (requires write permissions).
 
 ## Troubleshooting
 
+### System Requirements Issues
+
+**Python version too old:**
+```bash
+# Check Python version
+python3 --version
+
+# Install newer Python (Ubuntu/Debian)
+sudo apt update
+sudo apt install python3.8 python3.8-pip
+sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+```
+
+**Missing psutil library:**
+```bash
+# Try different installation methods
+pip3 install psutil
+# OR
+sudo apt install python3-psutil  # Debian/Ubuntu
+sudo yum install python3-psutil  # RHEL/CentOS
+sudo dnf install python3-psutil  # Fedora
+```
+
+**Missing system utilities:**
+```bash
+# Install essential monitoring tools
+sudo apt install net-tools lsof procps  # Debian/Ubuntu
+sudo yum install net-tools lsof procps-ng  # RHEL/CentOS
+```
+
 ### Permission Issues
 Some security checks require elevated privileges:
 ```bash
 sudo python3 self-check.py
 ```
 
-### Missing Dependencies
-```bash
-pip3 install psutil
-```
+### Architecture-Specific Issues
+
+**Raspberry Pi:**
+- Temperature monitoring requires access to `/sys/class/thermal/`
+- Some monitoring commands may have different output formats
+- Performance thresholds may need adjustment for ARM processors
+
+**Minimal/Container Systems:**
+- Some log files may not exist (`/var/log/auth.log`)
+- System utilities might be missing (install `procps`, `net-tools`)
+- SELinux/AppArmor may restrict access to system information
 
 ### Email Not Working
 1. Check SMTP settings in config.json
-2. Verify firewall allows SMTP traffic
-3. For Gmail, ensure app passwords are used
-4. Test with a simple Python SMTP script first
+2. Verify firewall allows SMTP traffic (port 587/465)
+3. For Gmail, ensure app passwords are used (not regular password)
+4. Test email configuration:
+   ```bash
+   python3 -c "import smtplib; print('SMTP module available')"
+   ```
 
-### Temperature Monitoring
-On some systems, temperature sensors may not be available. This is normal and the check will be skipped gracefully.
+### Service Installation Issues
+
+**systemd not available:**
+- Script will automatically fall back to cron
+- Manual scheduling: `crontab -e` and add the cron job
+
+**Permission denied during installation:**
+```bash
+# Ensure sudo access
+sudo ./install.sh
+
+# Check if user is in sudo group
+groups $USER
+```
+
+### Performance Issues
+
+**Script running too slowly:**
+- Enable lightweight mode in config.json
+- Increase cache timeout to reduce system calls
+- Check system load during execution
+
+**High resource usage:**
+- Adjust monitoring frequency (increase timer interval)
+- Disable unnecessary checks in configuration
+- Monitor execution time in logs
+
+### Debugging
+
+**Enable debug mode:**
+```json
+{
+  "debug": true,
+  "performance": {
+    "lightweight_mode": false
+  }
+}
+```
+
+**Check logs:**
+```bash
+# System logs
+sudo journalctl -u self-check.service -f
+
+# Application logs
+sudo tail -f /var/log/self-check.log
+
+# Test run with verbose output
+sudo python3 self-check.py --config config.json
+```
+
+### Getting Help
+
+1. Run the requirements checker: `python3 check-requirements.py`
+2. Test basic functionality: `python3 self-check.py --create-config`
+3. Check [GitHub Issues](https://github.com/bk86a/self-check/issues) for similar problems
+4. Include system information when reporting issues:
+   ```bash
+   uname -a
+   python3 --version
+   pip3 list | grep psutil
+   ```
 
 ## Contributing
 
