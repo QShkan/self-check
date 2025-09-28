@@ -8,7 +8,7 @@
     "swap_usage": 50.0
   },
   "email": {
-    "enabled": false,
+    "enabled": true,
     "smtp_server": "smtp.gmail.com",
     "smtp_port": 587,
     "username": "",

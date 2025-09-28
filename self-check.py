@@ -1161,9 +1161,12 @@ class SystemChecker:
         if not self.config.get('quiet', False):
             print(report)
 
-        # Send email notification if there are critical issues
-        if self.issues and self.config['email']['enabled']:
-            subject = f"CRITICAL System Alert - {socket.gethostname()}"
+        # Send email notification if there are critical issues or warnings
+        if (self.issues or self.warnings) and self.config['email']['enabled']:
+            if self.issues:
+                subject = f"CRITICAL System Alert - {socket.gethostname()}"
+            else:
+                subject = f"System Warnings - {socket.gethostname()}"
             self.send_email_notification(subject, report)
 
         return results
