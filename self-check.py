@@ -1019,7 +1019,7 @@ class SystemChecker:
 
         # Send email notification if there are critical issues
         if self.issues and self.config['email']['enabled']:
-            subject = f"System Alert - {socket.gethostname()}"
+            subject = f"CRITICAL System Alert - {socket.gethostname()}"
             self.send_email_notification(subject, report)
 
         return results

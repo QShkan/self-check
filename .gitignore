@@ -23,6 +23,9 @@ wheels/
 # Local configuration files
 config_local.json
 *.log
+.env
+.env.local
+.env.production
 
 # IDE
 .vscode/
