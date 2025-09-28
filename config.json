@@ -47,7 +47,7 @@
       993,
       995
     ],
-    "comment_whitelist_ports": "Add ports here that should be ignored in monitoring. Common examples: 5432 (PostgreSQL), 3306 (MySQL), 6379 (Redis), 5672 (RabbitMQ)"
+    "comment_whitelist_ports": "Add ports here that should be ignored in monitoring. Common examples: 5432 (PostgreSQL), 3306 (MySQL), 6379 (Redis), 5672 (RabbitMQ)",
     "max_failed_logins": 10,
     "reboot_check_hours": 24,
     "connection_monitoring": true
