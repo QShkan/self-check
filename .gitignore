@@ -42,3 +42,6 @@ Thumbs.db
 *.tmp
 *.temp
 results.json
+
+# Security baseline outputs (contain sensitive system info)
+security_baseline_*.txt
