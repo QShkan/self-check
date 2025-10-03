@@ -1987,8 +1987,9 @@ def main():
             with open(args.output, 'w') as f:
                 json.dump(results, f, indent=2)
 
-        # Exit with error code if critical issues found
-        sys.exit(1 if checker.issues else 0)
+        # Always exit with success code - the script execution status
+        # is separate from the monitoring results
+        sys.exit(0)
 
     except KeyboardInterrupt:
         print("\nCheck interrupted by user")

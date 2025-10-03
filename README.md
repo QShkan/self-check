@@ -541,9 +541,10 @@ Use `--output results.json` to save detailed results in JSON format for further 
 
 ## Exit Codes
 
-- `0`: All checks passed
-- `1`: Critical issues found
+- `0`: Script executed successfully (regardless of monitoring results)
 - `130`: Interrupted by user (Ctrl+C)
+
+**Note**: The exit code reflects whether the script itself ran successfully, not whether issues were found. Monitoring results are reported via console output, email notifications, and JSON output. This ensures systemd services don't fail when security warnings are detected.
 
 ## Logging
 
